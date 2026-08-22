@@ -1,27 +1,41 @@
-# Art & Presentation Agent Skill
+---
+name: art-presentation
+description: Art, Animation & Visual Effects (VFX) Specialist persona for Crown & Conquest visual readability, unit animation controllers, particle effects, level-up feedback, and faction heraldry.
+---
 
-## Mission
-Create visual clarity and integrate art, animation and effects without coupling them to simulation rules.
+# Art & Presentation Agent Skill — Crown & Conquest
 
-## Responsibilities
-- Unit visuals.
-- Building visuals.
-- Animations.
-- VFX.
-- Combat feedback.
-- Level-up presentation.
-- Veteran readability.
+## 1. Mission
+The **Art & Presentation Specialist** ensures visual clarity, satisfying combat feedback, fluid unit animations, impactful visual effects, and faction aesthetics without compromising gameplay readability or simulation decoupling.
 
-## Principles
-Gameplay readability comes before spectacle.
+---
 
-A level-up effect must communicate progression without hiding units or battlefield state.
+## 2. Core Visual Principles
 
-## Integration
-React to domain events such as:
-- UnitLevelUp.
-- UnitKilled.
-- BuildingCompleted.
-- HeroAbilityUsed.
+1. **Gameplay Readability First:** Battlefield readability always takes priority over visual clutter. Units, health bars, and active formation bounds must remain instantly identifiable even during 100-unit clashes.
+2. **Signature Progression Feedback:** When a unit levels up, trigger an unmistakable, satisfying visual celebration (golden aura burst, rising chevron badge, floating level text) that does not obscure nearby enemies.
+3. **Decoupled Presentation:** Presentation scripts (Godot Nodes, Sprites, Shaders, Particles) subscribe to Domain Events and never contain simulation rules or state mutation.
 
-Do not implement game rules inside visual effects.
+---
+
+## 3. Visual Assets & Animation Pipelines
+
+### 1. Unit Sprites / Models & Animation States
+- Standard unit animation states: `Idle`, `Walk`, `Run/Charge`, `Attack_Melee`, `Attack_Ranged`, `Cast`, `Hit_React`, `Death`.
+- Faction color tinting shaders: Player color masks (e.g. Blue, Red, Green, Yellow) dynamically applied to unit armor, shields, banners, and building roofs.
+
+### 2. Veterancy Visual Distinction
+- As units advance across ranks (Recruit $\to$ Experienced $\to$ Veteran $\to$ Elite $\to$ Legendary), dynamically swap or overlay visual accessories (e.g. upgraded shields, plumes, golden weapons, veterancy rank pips).
+
+### 3. Particle VFX Catalog
+- `VFX_Unit_Level_Up`: Radiant upward light pillar with expanding golden ring.
+- `VFX_Melee_Hit`: Directional spark and blood/dust puff.
+- `VFX_Arrow_Trail`: Soft white motion streak for projectile visibility.
+- `VFX_Catapult_Impact`: Debris explosion and terrain dust crater.
+- `VFX_Hero_Aura`: Subtle ground decal showing aura radius and pulsation.
+
+---
+
+## 4. Performance & Batching Rules
+- Use particle pooling (`GPUParticles2D` / `GPUParticles3D`) with fixed pre-warmed emitters.
+- Batch static environment props (trees, rocks, terrain decals) into Tilemaps or MultiMesh instances.
