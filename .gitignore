@@ -1,0 +1,30 @@
+# Godot 4 & C# / .NET .gitignore
+.godot/
+.mono/
+.import/
+export.cfg
+export_presets.cfg
+
+# .NET / C# build outputs
+bin/
+obj/
+*.user
+*.userprefs
+*.suo
+*.ide/
+*.tmp
+
+# Visual Studio & Rider / IDE configs
+.vs/
+.idea/
+*.rsuser
+
+# OS Specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and test results
+*.log
+TestResults/
+coverage/

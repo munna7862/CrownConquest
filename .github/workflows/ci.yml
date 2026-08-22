@@ -1,0 +1,30 @@
+name: Crown & Conquest CI
+
+on:
+  push:
+    branches: [ main, 'feature/**', 'fix/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Deterministic Test Suite
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8.0 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore CrownConquest.sln
+
+      - name: Build Solution (Warnings as Errors)
+        run: dotnet build CrownConquest.sln --no-restore --configuration Release
+
+      - name: Run Headless xUnit Tests
+        run: dotnet test CrownConquest.sln --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test_results.trx"

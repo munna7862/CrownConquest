@@ -1,0 +1,58 @@
+[
+  {
+    "id": "celtic_swordsman",
+    "displayName": "Celtic Swordsman",
+    "faction": "celtic",
+    "maxHealth": 120.0,
+    "attackDamage": 18.0,
+    "attackRange": 1.5,
+    "movementSpeed": 3.6,
+    "attackCooldownTicks": 18,
+    "killXpValue": 60,
+    "goldCost": 60,
+    "foodCost": 40,
+    "trainingTicks": 80
+  },
+  {
+    "id": "celtic_archer",
+    "displayName": "Celtic Archer",
+    "faction": "celtic",
+    "maxHealth": 80.0,
+    "attackDamage": 14.0,
+    "attackRange": 8.0,
+    "movementSpeed": 3.8,
+    "attackCooldownTicks": 22,
+    "killXpValue": 50,
+    "goldCost": 50,
+    "foodCost": 50,
+    "trainingTicks": 90
+  },
+  {
+    "id": "roman_legionary",
+    "displayName": "Roman Legionary",
+    "faction": "roman",
+    "maxHealth": 140.0,
+    "attackDamage": 16.0,
+    "attackRange": 1.5,
+    "movementSpeed": 3.2,
+    "attackCooldownTicks": 20,
+    "killXpValue": 70,
+    "goldCost": 75,
+    "foodCost": 45,
+    "trainingTicks": 100
+  },
+  {
+    "id": "roman_veles",
+    "displayName": "Roman Veles (Skirmisher)",
+    "faction": "roman",
+    "maxHealth": 85.0,
+    "attackDamage": 12.0,
+    "attackRange": 7.0,
+    "movementSpeed": 4.0,
+    "attackCooldownTicks": 16,
+    "killXpValue": 45,
+    "goldCost": 40,
+    "foodCost": 40,
+    "trainingTicks": 70
+  }
+]

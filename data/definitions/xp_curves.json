@@ -1,0 +1,20 @@
+[
+  {
+    "id": "standard_infantry_curve",
+    "levelXpThresholds": [0, 100, 250, 450, 700, 1000, 1350, 1750, 2200, 2700],
+    "healthPerLevelBonus": 15.0,
+    "damagePerLevelBonus": 2.5
+  },
+  {
+    "id": "ranged_unit_curve",
+    "levelXpThresholds": [0, 90, 220, 400, 630, 900, 1220, 1580, 1980, 2430],
+    "healthPerLevelBonus": 10.0,
+    "damagePerLevelBonus": 2.0
+  },
+  {
+    "id": "cavalry_curve",
+    "levelXpThresholds": [0, 120, 300, 550, 850, 1200, 1600, 2050, 2550, 3100],
+    "healthPerLevelBonus": 20.0,
+    "damagePerLevelBonus": 3.0
+  }
+]
