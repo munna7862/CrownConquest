@@ -27,6 +27,7 @@ public sealed class UnitEntity
     public EntityId Id { get; }
     public FactionId FactionId { get; }
     public string UnitType { get; }
+    public UnitArchetype Archetype { get; }
 
     public Vector2D Position { get; set; }
     public Vector2D? MoveTarget { get; set; }
@@ -80,11 +81,13 @@ public sealed class UnitEntity
         float damagePerLevelBonus = 2.5f,
         float armorPerLevelBonus = 1.0f,
         int[]? xpThresholds = null,
-        WorkerGatherState? workerState = null)
+        WorkerGatherState? workerState = null,
+        UnitArchetype? archetype = null)
     {
         Id = id;
         FactionId = factionId;
         UnitType = unitType;
+        Archetype = archetype ?? UnitArchetypeExtensions.FromUnitType(unitType);
         Position = position;
         BaseMaxHealth = maxHealth;
         CurrentHealth = maxHealth;
@@ -178,11 +181,32 @@ public sealed class UnitEntity
         DomainEventBus eventBus,
         out bool killed)
     {
+        float effectiveDamage = CombatFormulas.CalculateEffectiveDamage(rawAmount, Armor);
+        ApplyCalculatedDamage(effectiveDamage, attackerId, attackerFaction, tick, eventBus, out killed);
+    }
+
+    public void TakeCombatDamage(
+        float calculatedEffectiveDamage,
+        EntityId attackerId,
+        FactionId attackerFaction,
+        ulong tick,
+        DomainEventBus eventBus,
+        out bool killed)
+    {
+        ApplyCalculatedDamage(calculatedEffectiveDamage, attackerId, attackerFaction, tick, eventBus, out killed);
+    }
+
+    private void ApplyCalculatedDamage(
+        float effectiveDamage,
+        EntityId attackerId,
+        FactionId attackerFaction,
+        ulong tick,
+        DomainEventBus eventBus,
+        out bool killed)
+    {
         killed = false;
         if (!IsAlive) return;
 
-        // Apply armor mitigation formula
-        float effectiveDamage = CombatFormulas.CalculateEffectiveDamage(rawAmount, Armor);
         CurrentHealth = MathF.Max(0f, CurrentHealth - effectiveDamage);
 
         eventBus.Publish(new DamageDealtEvent(

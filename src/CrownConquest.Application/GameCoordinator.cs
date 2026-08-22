@@ -106,6 +106,26 @@ public sealed class GameCoordinator : ICommandDispatcher
         return DispatchCommand(new SelectIdleWorkersCommand(CurrentTick, factionId));
     }
 
+    public Result IssueAdvanceEraOrder(FactionId factionId, EntityId buildingId, CivilizationEra targetEra)
+    {
+        return DispatchCommand(new AdvanceEraCommand(CurrentTick, factionId, buildingId, targetEra));
+    }
+
+    public Result IssueCancelEraAdvancementOrder(FactionId factionId)
+    {
+        return DispatchCommand(new CancelEraAdvancementCommand(CurrentTick, factionId));
+    }
+
+    public Result IssueStartResearchOrder(FactionId factionId, EntityId buildingId, string techId)
+    {
+        return DispatchCommand(new StartResearchCommand(CurrentTick, factionId, buildingId, techId));
+    }
+
+    public Result IssueCancelResearchOrder(FactionId factionId, EntityId buildingId, int queueIndex = 0)
+    {
+        return DispatchCommand(new CancelResearchCommand(CurrentTick, factionId, buildingId, queueIndex));
+    }
+
     public EntityId[] GetIdleWorkers(FactionId factionId)
     {
         return _simulation.GetIdleWorkers(factionId);
@@ -119,5 +139,15 @@ public sealed class GameCoordinator : ICommandDispatcher
     public PopulationManager GetPopulationManager(FactionId factionId)
     {
         return _simulation.State.GetOrCreatePopulationManager(factionId);
+    }
+
+    public EraState GetEraState(FactionId factionId)
+    {
+        return _simulation.State.GetOrCreateEraState(factionId);
+    }
+
+    public FactionTechManager GetTechManager(FactionId factionId)
+    {
+        return _simulation.State.GetOrCreateTechManager(factionId);
     }
 }

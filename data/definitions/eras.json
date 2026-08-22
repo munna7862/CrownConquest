@@ -1,0 +1,54 @@
+[
+  {
+    "id": "archaic",
+    "era": 0,
+    "displayName": "Tribal / Archaic Era",
+    "description": "Initial settlement with simple wooden structures, gatherers, and basic infantry.",
+    "durationTicks": 0,
+    "foodCost": 0,
+    "goldCost": 0,
+    "woodCost": 0,
+    "stoneCost": 0,
+    "ironCost": 0,
+    "requiredBuildingTypes": []
+  },
+  {
+    "id": "classical",
+    "era": 1,
+    "displayName": "Bronze / Classical Era",
+    "description": "Unlocks Archery Range, Stables, Blacksmith, Watchtowers, and military training upgrades.",
+    "durationTicks": 100,
+    "foodCost": 500,
+    "goldCost": 200,
+    "woodCost": 0,
+    "stoneCost": 0,
+    "ironCost": 0,
+    "requiredBuildingTypes": ["town_center", "barracks"]
+  },
+  {
+    "id": "imperial",
+    "era": 2,
+    "displayName": "Iron / Imperial Era",
+    "description": "Unlocks heavy legionnaires, heavy cavalry, advanced metallurgy, and fortifications.",
+    "durationTicks": 150,
+    "foodCost": 800,
+    "goldCost": 500,
+    "woodCost": 0,
+    "stoneCost": 0,
+    "ironCost": 0,
+    "requiredBuildingTypes": ["blacksmith", "stable"]
+  },
+  {
+    "id": "feudal",
+    "era": 3,
+    "displayName": "Feudal / Sovereign Era",
+    "description": "Master civilization technologies, elite champions, and monumental fortresses.",
+    "durationTicks": 200,
+    "foodCost": 1000,
+    "goldCost": 800,
+    "woodCost": 0,
+    "stoneCost": 0,
+    "ironCost": 0,
+    "requiredBuildingTypes": ["town_center"]
+  }
+]

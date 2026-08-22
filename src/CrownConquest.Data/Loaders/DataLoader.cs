@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using CrownConquest.Data.Models;
 using CrownConquest.Domain.Common;
@@ -142,6 +145,62 @@ public static class DataLoader
         }
     }
 
+    public static Result<List<EraDefinition>> LoadErasFromJson(string json)
+    {
+        try
+        {
+            var eras = JsonSerializer.Deserialize<List<EraDefinition>>(json, JsonOptions);
+            if (eras == null || eras.Count == 0)
+            {
+                return Result<List<EraDefinition>>.Failure(new GameError("EMPTY_DATA", "Eras definition is empty."));
+            }
+
+            foreach (var era in eras)
+            {
+                if (string.IsNullOrWhiteSpace(era.Id))
+                {
+                    return Result<List<EraDefinition>>.Failure(new GameError("INVALID_ERA_ID", "Era ID cannot be empty."));
+                }
+            }
+
+            return Result<List<EraDefinition>>.Success(eras);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<EraDefinition>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<TechnologyDefinitionModel>> LoadTechnologiesFromJson(string json)
+    {
+        try
+        {
+            var techs = JsonSerializer.Deserialize<List<TechnologyDefinitionModel>>(json, JsonOptions);
+            if (techs == null || techs.Count == 0)
+            {
+                return Result<List<TechnologyDefinitionModel>>.Failure(new GameError("EMPTY_DATA", "Technologies definition is empty."));
+            }
+
+            foreach (var tech in techs)
+            {
+                if (string.IsNullOrWhiteSpace(tech.Id))
+                {
+                    return Result<List<TechnologyDefinitionModel>>.Failure(new GameError("INVALID_TECH_ID", "Technology ID cannot be empty."));
+                }
+                if (tech.ResearchDurationTicks <= 0)
+                {
+                    return Result<List<TechnologyDefinitionModel>>.Failure(new GameError("INVALID_TECH_DURATION", $"Invalid duration for tech {tech.Id}."));
+                }
+            }
+
+            return Result<List<TechnologyDefinitionModel>>.Success(techs);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<TechnologyDefinitionModel>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
     public static Result<List<UnitDefinition>> LoadUnitsFromFile(string filePath)
     {
         if (!File.Exists(filePath))
@@ -180,5 +239,25 @@ public static class DataLoader
         }
         string json = File.ReadAllText(filePath);
         return LoadResourcesFromJson(json);
+    }
+
+    public static Result<List<EraDefinition>> LoadErasFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<EraDefinition>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadErasFromJson(json);
+    }
+
+    public static Result<List<TechnologyDefinitionModel>> LoadTechnologiesFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<TechnologyDefinitionModel>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadTechnologiesFromJson(json);
     }
 }

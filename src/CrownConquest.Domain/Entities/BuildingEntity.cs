@@ -7,7 +7,7 @@ using CrownConquest.Domain.Events;
 namespace CrownConquest.Domain.Entities;
 
 /// <summary>
-/// Authoritative domain entity representing a settlement building (Town Center, House, Barracks, Storage Pit).
+/// Authoritative domain entity representing a settlement building (Town Center, House, Barracks, Blacksmith, Archery Range, Stable).
 /// Decoupled from Godot nodes.
 /// </summary>
 public sealed class BuildingEntity
@@ -39,6 +39,7 @@ public sealed class BuildingEntity
     public bool IsFarmDepleted => IsFarm && FarmFoodRemaining <= 0;
 
     public ProductionQueue ProductionQueue { get; }
+    public ResearchQueue ResearchQueue { get; }
     public Vector2D RallyPoint { get; set; }
 
     public Rect2D BoundingBox => Rect2D.FromCenterAndExtents(Position, GridSize.X * 0.5f, GridSize.Y * 0.5f);
@@ -76,6 +77,7 @@ public sealed class BuildingEntity
         FarmFoodRemaining = IsFarm ? maxFarmFood : 0;
         FarmReseedCost = farmReseedCost;
         ProductionQueue = new ProductionQueue(maxQueueSize: 5);
+        ResearchQueue = new ResearchQueue(maxQueueSize: 5);
         RallyPoint = rallyPoint ?? new Vector2D(position.X + (gridSize.X * 0.5f) + 1.5f, position.Y);
 
         if (startsConstructed)
@@ -194,7 +196,6 @@ public sealed class BuildingEntity
         if (CurrentHealth <= 0f)
         {
             destroyed = true;
-            // Additional building destroyed event can be emitted if needed
         }
     }
 }
