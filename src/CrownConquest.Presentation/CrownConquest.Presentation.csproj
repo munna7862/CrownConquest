@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>CrownConquest.Presentation</RootNamespace>
+    <AssemblyName>CrownConquest.Presentation</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CrownConquest.Domain\CrownConquest.Domain.csproj" />
+    <ProjectReference Include="..\CrownConquest.Application\CrownConquest.Application.csproj" />
+    <ProjectReference Include="..\CrownConquest.Data\CrownConquest.Data.csproj" />
+  </ItemGroup>
+
+</Project>
