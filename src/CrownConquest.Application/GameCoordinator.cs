@@ -91,9 +91,24 @@ public sealed class GameCoordinator : ICommandDispatcher
         return DispatchCommand(new QueueProductionCommand(CurrentTick, factionId, buildingId, unitType));
     }
 
-    public Result IssueCancelProductionOrder(FactionId factionId, EntityId buildingId, int queueIndex)
+    public Result IssueRepairOrder(FactionId factionId, EntityId[] workerIds, EntityId buildingId)
     {
-        return DispatchCommand(new CancelProductionCommand(CurrentTick, factionId, buildingId, queueIndex));
+        return DispatchCommand(new RepairBuildingCommand(CurrentTick, factionId, workerIds, buildingId));
+    }
+
+    public Result IssueReseedFarmOrder(FactionId factionId, EntityId farmId)
+    {
+        return DispatchCommand(new ReseedFarmCommand(CurrentTick, factionId, farmId));
+    }
+
+    public Result IssueSelectIdleWorkersOrder(FactionId factionId)
+    {
+        return DispatchCommand(new SelectIdleWorkersCommand(CurrentTick, factionId));
+    }
+
+    public EntityId[] GetIdleWorkers(FactionId factionId)
+    {
+        return _simulation.GetIdleWorkers(factionId);
     }
 
     public ResourceBank GetResourceBank(FactionId factionId)

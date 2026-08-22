@@ -10,11 +10,13 @@ public enum WorkerTaskState
     Harvesting,
     ReturningToDropOff,
     MovingToConstruct,
-    Constructing
+    Constructing,
+    MovingToRepair,
+    Repairing
 }
 
 /// <summary>
-/// State tracking carried inventory, target resource nodes, and construction tasks for worker units.
+/// State tracking carried inventory, target resource nodes, construction tasks, and repair tasks for worker units.
 /// </summary>
 public sealed class WorkerGatherState
 {
@@ -29,6 +31,7 @@ public sealed class WorkerGatherState
     public float HarvestRatePerTick { get; }
     public float HarvestProgressAccumulator { get; set; }
     public float BuildPowerPerTick { get; }
+    public float RepairPowerPerTick { get; }
 
     public bool HasCarriedResources => CarriedAmount > 0 && CarriedResourceType.HasValue;
     public bool IsInventoryFull => CarriedAmount >= CarryCapacity;
@@ -36,11 +39,13 @@ public sealed class WorkerGatherState
     public WorkerGatherState(
         int carryCapacity = 10,
         float harvestRatePerTick = 0.5f,
-        float buildPowerPerTick = 1.0f)
+        float buildPowerPerTick = 1.0f,
+        float repairPowerPerTick = 1.5f)
     {
         CarryCapacity = Math.Max(1, carryCapacity);
         HarvestRatePerTick = Math.Max(0.01f, harvestRatePerTick);
         BuildPowerPerTick = Math.Max(0.01f, buildPowerPerTick);
+        RepairPowerPerTick = Math.Max(0.01f, repairPowerPerTick);
         TaskState = WorkerTaskState.None;
         TargetResourceNodeId = EntityId.None;
         TargetBuildingId = EntityId.None;

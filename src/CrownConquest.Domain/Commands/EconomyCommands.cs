@@ -37,3 +37,19 @@ public sealed record SetRallyPointCommand(
     FactionId FactionId,
     EntityId BuildingId,
     Vector2D RallyPoint) : ICommand;
+
+public sealed record RepairBuildingCommand(
+    ulong SubmittedTick,
+    FactionId FactionId,
+    EntityId[] WorkerIds,
+    EntityId BuildingId) : ICommand;
+
+public sealed record ReseedFarmCommand(
+    ulong SubmittedTick,
+    FactionId FactionId,
+    EntityId FarmId) : ICommand;
+
+public sealed record SelectIdleWorkersCommand(
+    ulong SubmittedTick,
+    FactionId FactionId) : ICommand;
+

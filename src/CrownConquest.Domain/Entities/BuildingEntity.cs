@@ -31,10 +31,18 @@ public sealed class BuildingEntity
     private readonly HashSet<ResourceType> _acceptedDropOffTypes;
     public IReadOnlyCollection<ResourceType> AcceptedDropOffTypes => _acceptedDropOffTypes;
 
+    public ResourceCost BaseCost { get; }
+    public bool IsFarm { get; }
+    public int MaxFarmFood { get; }
+    public int FarmFoodRemaining { get; private set; }
+    public int FarmReseedCost { get; }
+    public bool IsFarmDepleted => IsFarm && FarmFoodRemaining <= 0;
+
     public ProductionQueue ProductionQueue { get; }
     public Vector2D RallyPoint { get; set; }
 
     public Rect2D BoundingBox => Rect2D.FromCenterAndExtents(Position, GridSize.X * 0.5f, GridSize.Y * 0.5f);
+    public bool IsDamaged => IsConstructed && IsAlive && CurrentHealth < MaxHealth;
 
     public BuildingEntity(
         EntityId id,
@@ -47,7 +55,11 @@ public sealed class BuildingEntity
         int populationProvided = 0,
         IEnumerable<ResourceType>? acceptedDropOffTypes = null,
         bool startsConstructed = false,
-        Vector2D? rallyPoint = null)
+        Vector2D? rallyPoint = null,
+        ResourceCost? baseCost = null,
+        bool isFarm = false,
+        int maxFarmFood = 250,
+        int farmReseedCost = 60)
     {
         Id = id;
         FactionId = factionId;
@@ -58,6 +70,11 @@ public sealed class BuildingEntity
         BaseBuildTimeTicks = Math.Max(1f, baseBuildTimeTicks);
         PopulationProvided = populationProvided;
         _acceptedDropOffTypes = acceptedDropOffTypes != null ? new HashSet<ResourceType>(acceptedDropOffTypes) : new HashSet<ResourceType>();
+        BaseCost = baseCost ?? new ResourceCost(Wood: 100);
+        IsFarm = isFarm || buildingType.Equals("farm", StringComparison.OrdinalIgnoreCase);
+        MaxFarmFood = maxFarmFood;
+        FarmFoodRemaining = IsFarm ? maxFarmFood : 0;
+        FarmReseedCost = farmReseedCost;
         ProductionQueue = new ProductionQueue(maxQueueSize: 5);
         RallyPoint = rallyPoint ?? new Vector2D(position.X + (gridSize.X * 0.5f) + 1.5f, position.Y);
 
@@ -105,6 +122,61 @@ public sealed class BuildingEntity
             completedJustNow = true;
             eventBus?.Publish(new BuildingCompletedEvent(tick, Id, FactionId, BuildingType, Position));
         }
+    }
+
+    public void Repair(
+        float repairAmount,
+        ulong tick,
+        DomainEventBus? eventBus,
+        out bool fullyRepaired)
+    {
+        fullyRepaired = false;
+        if (!IsConstructed || !IsAlive || repairAmount <= 0f || CurrentHealth >= MaxHealth)
+        {
+            if (CurrentHealth >= MaxHealth) fullyRepaired = true;
+            return;
+        }
+
+        CurrentHealth = Math.Min(MaxHealth, CurrentHealth + repairAmount);
+        eventBus?.Publish(new BuildingRepairProgressEvent(tick, Id, CurrentHealth, MaxHealth));
+
+        if (CurrentHealth >= MaxHealth)
+        {
+            CurrentHealth = MaxHealth;
+            fullyRepaired = true;
+            eventBus?.Publish(new BuildingRepairedEvent(tick, Id, FactionId, BuildingType));
+        }
+    }
+
+    public int HarvestFarmFood(
+        int request,
+        ulong tick,
+        EntityId workerId,
+        DomainEventBus? eventBus)
+    {
+        if (!IsFarm || !IsConstructed || !IsAlive || FarmFoodRemaining <= 0 || request <= 0)
+        {
+            return 0;
+        }
+
+        int harvested = Math.Min(request, FarmFoodRemaining);
+        FarmFoodRemaining -= harvested;
+
+        if (FarmFoodRemaining <= 0)
+        {
+            FarmFoodRemaining = 0;
+            eventBus?.Publish(new FarmDepletedEvent(tick, Id, FactionId));
+        }
+
+        return harvested;
+    }
+
+    public void ReseedFarm(ulong tick, DomainEventBus? eventBus)
+    {
+        if (!IsFarm || !IsAlive) return;
+
+        FarmFoodRemaining = MaxFarmFood;
+        eventBus?.Publish(new FarmReseededEvent(tick, Id, FactionId, MaxFarmFood));
     }
 
     public void TakeDamage(
