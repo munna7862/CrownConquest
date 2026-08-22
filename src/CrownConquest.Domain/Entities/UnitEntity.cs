@@ -1,6 +1,7 @@
 using System;
 using CrownConquest.Domain.Combat;
 using CrownConquest.Domain.Common;
+using CrownConquest.Domain.Economy;
 using CrownConquest.Domain.Events;
 
 namespace CrownConquest.Domain.Entities;
@@ -10,11 +11,14 @@ public enum UnitState
     Idle,
     Moving,
     Attacking,
+    Gathering,
+    Returning,
+    Constructing,
     Dead
 }
 
 /// <summary>
-/// Authoritative domain entity representing a combat-capable unit.
+/// Authoritative domain entity representing a combat-capable or worker unit.
 /// Entirely decoupled from Godot nodes.
 /// </summary>
 public sealed class UnitEntity
@@ -27,6 +31,9 @@ public sealed class UnitEntity
     public Vector2D? MoveTarget { get; set; }
     public EntityId AttackTargetId { get; set; }
     public UnitState State { get; set; }
+
+    public WorkerGatherState? WorkerState { get; set; }
+    public bool IsWorker => WorkerState != null;
 
     public float BaseMaxHealth { get; }
     public float HealthPerLevelBonus { get; }
@@ -70,7 +77,8 @@ public sealed class UnitEntity
         float healthPerLevelBonus = 15.0f,
         float damagePerLevelBonus = 2.5f,
         float armorPerLevelBonus = 1.0f,
-        int[]? xpThresholds = null)
+        int[]? xpThresholds = null,
+        WorkerGatherState? workerState = null)
     {
         Id = id;
         FactionId = factionId;
@@ -92,6 +100,7 @@ public sealed class UnitEntity
         AggroRange = aggroRange;
         State = UnitState.Idle;
         Veterancy = new VeterancyState(id, customThresholds: xpThresholds);
+        WorkerState = workerState;
     }
 
     public void Move(Vector2D destination)
@@ -99,6 +108,10 @@ public sealed class UnitEntity
         if (!IsAlive) return;
         MoveTarget = destination;
         AttackTargetId = EntityId.None;
+        if (WorkerState != null)
+        {
+            WorkerState.ResetTask();
+        }
         State = UnitState.Moving;
     }
 
@@ -107,13 +120,39 @@ public sealed class UnitEntity
         if (!IsAlive) return;
         AttackTargetId = targetId;
         MoveTarget = null;
+        if (WorkerState != null)
+        {
+            WorkerState.ResetTask();
+        }
         State = UnitState.Attacking;
+    }
+
+    public void AssignGather(EntityId resourceNodeId)
+    {
+        if (!IsAlive || WorkerState == null) return;
+        WorkerState.TargetResourceNodeId = resourceNodeId;
+        WorkerState.TaskState = WorkerTaskState.MovingToResource;
+        AttackTargetId = EntityId.None;
+        State = UnitState.Gathering;
+    }
+
+    public void AssignConstruct(EntityId buildingId)
+    {
+        if (!IsAlive || WorkerState == null) return;
+        WorkerState.TargetBuildingId = buildingId;
+        WorkerState.TaskState = WorkerTaskState.MovingToConstruct;
+        AttackTargetId = EntityId.None;
+        State = UnitState.Constructing;
     }
 
     public void Stop()
     {
         MoveTarget = null;
         AttackTargetId = EntityId.None;
+        if (WorkerState != null)
+        {
+            WorkerState.ResetTask();
+        }
         if (IsAlive)
         {
             State = UnitState.Idle;

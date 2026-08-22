@@ -1,5 +1,23 @@
 [
   {
+    "id": "celtic_villager",
+    "displayName": "Celtic Villager",
+    "faction": "celtic",
+    "maxHealth": 50.0,
+    "attackDamage": 5.0,
+    "armor": 0.0,
+    "attackRange": 1.0,
+    "attackType": "melee",
+    "movementSpeed": 3.5,
+    "attackCooldownTicks": 25,
+    "killXpValue": 25,
+    "aggroRange": 6.0,
+    "xpCurveId": "standard_infantry_curve",
+    "goldCost": 0,
+    "foodCost": 50,
+    "trainingTicks": 50
+  },
+  {
     "id": "celtic_swordsman",
     "displayName": "Celtic Swordsman",
     "faction": "celtic",
@@ -34,6 +52,24 @@
     "goldCost": 50,
     "foodCost": 50,
     "trainingTicks": 90
+  },
+  {
+    "id": "roman_villager",
+    "displayName": "Roman Plebeian (Worker)",
+    "faction": "roman",
+    "maxHealth": 50.0,
+    "attackDamage": 5.0,
+    "armor": 0.0,
+    "attackRange": 1.0,
+    "attackType": "melee",
+    "movementSpeed": 3.5,
+    "attackCooldownTicks": 25,
+    "killXpValue": 25,
+    "aggroRange": 6.0,
+    "xpCurveId": "standard_infantry_curve",
+    "goldCost": 0,
+    "foodCost": 50,
+    "trainingTicks": 50
   },
   {
     "id": "roman_legionary",
