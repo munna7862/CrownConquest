@@ -1,3 +1,5 @@
+using System;
+using CrownConquest.Domain.Combat;
 using CrownConquest.Domain.Common;
 using CrownConquest.Domain.Events;
 
@@ -27,17 +29,25 @@ public sealed class UnitEntity
     public UnitState State { get; set; }
 
     public float BaseMaxHealth { get; }
-    public float MaxHealth => BaseMaxHealth + ((Veterancy.Level - 1) * 15f);
+    public float HealthPerLevelBonus { get; }
+    public float MaxHealth => BaseMaxHealth + ((Veterancy.Level - 1) * HealthPerLevelBonus);
     public float CurrentHealth { get; private set; }
 
     public float BaseAttackDamage { get; }
-    public float AttackDamage => BaseAttackDamage + ((Veterancy.Level - 1) * 2.5f);
+    public float DamagePerLevelBonus { get; }
+    public float AttackDamage => BaseAttackDamage + ((Veterancy.Level - 1) * DamagePerLevelBonus);
+
+    public float BaseArmor { get; }
+    public float ArmorPerLevelBonus { get; }
+    public float Armor => BaseArmor + ((Veterancy.Level - 1) * ArmorPerLevelBonus);
 
     public float AttackRange { get; }
+    public string AttackType { get; } // "melee" or "ranged"
     public float MovementSpeed { get; }
     public int AttackCooldownTicks { get; }
     public int CooldownRemaining { get; private set; }
     public int KillXpValue { get; }
+    public float AggroRange { get; set; }
 
     public bool IsAlive => CurrentHealth > 0f && State != UnitState.Dead;
 
@@ -53,7 +63,14 @@ public sealed class UnitEntity
         float attackRange = 1.5f,
         float movementSpeed = 3.5f,
         int attackCooldownTicks = 20,
-        int killXpValue = 50)
+        int killXpValue = 50,
+        float baseArmor = 0f,
+        string attackType = "melee",
+        float aggroRange = 10.0f,
+        float healthPerLevelBonus = 15.0f,
+        float damagePerLevelBonus = 2.5f,
+        float armorPerLevelBonus = 1.0f,
+        int[]? xpThresholds = null)
     {
         Id = id;
         FactionId = factionId;
@@ -61,14 +78,20 @@ public sealed class UnitEntity
         Position = position;
         BaseMaxHealth = maxHealth;
         CurrentHealth = maxHealth;
+        HealthPerLevelBonus = healthPerLevelBonus;
         BaseAttackDamage = attackDamage;
+        DamagePerLevelBonus = damagePerLevelBonus;
+        BaseArmor = baseArmor;
+        ArmorPerLevelBonus = armorPerLevelBonus;
         AttackRange = attackRange;
+        AttackType = attackType;
         MovementSpeed = movementSpeed;
         AttackCooldownTicks = attackCooldownTicks;
         CooldownRemaining = 0;
         KillXpValue = killXpValue;
+        AggroRange = aggroRange;
         State = UnitState.Idle;
-        Veterancy = new VeterancyState(id);
+        Veterancy = new VeterancyState(id, customThresholds: xpThresholds);
     }
 
     public void Move(Vector2D destination)
@@ -98,7 +121,7 @@ public sealed class UnitEntity
     }
 
     public void TakeDamage(
-        float amount,
+        float rawAmount,
         EntityId attackerId,
         FactionId attackerFaction,
         ulong tick,
@@ -108,13 +131,15 @@ public sealed class UnitEntity
         killed = false;
         if (!IsAlive) return;
 
-        CurrentHealth = MathF.Max(0f, CurrentHealth - amount);
+        // Apply armor mitigation formula
+        float effectiveDamage = CombatFormulas.CalculateEffectiveDamage(rawAmount, Armor);
+        CurrentHealth = MathF.Max(0f, CurrentHealth - effectiveDamage);
 
         eventBus.Publish(new DamageDealtEvent(
             tick,
             attackerId,
             Id,
-            amount,
+            effectiveDamage,
             CurrentHealth,
             IsCritical: false));
 
@@ -132,6 +157,14 @@ public sealed class UnitEntity
                 FactionId,
                 attackerFaction,
                 Position));
+        }
+    }
+
+    public void ApplyLevelUpBonus(float healthBonus)
+    {
+        if (IsAlive && healthBonus > 0f)
+        {
+            CurrentHealth = MathF.Min(MaxHealth, CurrentHealth + healthBonus);
         }
     }
 
