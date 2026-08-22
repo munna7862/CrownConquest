@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using CrownConquest.Data.Models;
 using CrownConquest.Domain.Common;
+using CrownConquest.Domain.Economy;
 using CrownConquest.Domain.Entities;
 
 namespace CrownConquest.Data;
@@ -69,6 +71,13 @@ public sealed class UnitFactory
             dmgBonus = curve.DamagePerLevelBonus;
         }
 
+        WorkerGatherState? workerState = null;
+        if (def.Id.Contains("villager", StringComparison.OrdinalIgnoreCase) ||
+            def.Id.Contains("worker", StringComparison.OrdinalIgnoreCase))
+        {
+            workerState = new WorkerGatherState(carryCapacity: 10, harvestRatePerTick: 0.5f, buildPowerPerTick: 1.0f);
+        }
+
         var unit = new UnitEntity(
             id: id,
             factionId: factionId,
@@ -85,7 +94,8 @@ public sealed class UnitFactory
             aggroRange: def.AggroRange,
             healthPerLevelBonus: hpBonus,
             damagePerLevelBonus: dmgBonus,
-            xpThresholds: xpThresholds);
+            xpThresholds: xpThresholds,
+            workerState: workerState);
 
         return Result<UnitEntity>.Success(unit);
     }

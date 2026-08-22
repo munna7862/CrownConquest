@@ -1,5 +1,7 @@
+using System;
 using CrownConquest.Domain.Commands;
 using CrownConquest.Domain.Common;
+using CrownConquest.Domain.Economy;
 using CrownConquest.Domain.Events;
 using CrownConquest.Domain.Simulation;
 
@@ -67,5 +69,40 @@ public sealed class GameCoordinator : ICommandDispatcher
 
         _simulation.CommandQueue.Enqueue(command);
         return Result.Success();
+    }
+
+    public Result IssueGatherOrder(FactionId factionId, EntityId[] workerIds, EntityId targetNodeId)
+    {
+        return DispatchCommand(new GatherCommand(CurrentTick, factionId, workerIds, targetNodeId));
+    }
+
+    public Result IssuePlaceBuildingOrder(FactionId factionId, string buildingType, Vector2D position)
+    {
+        return DispatchCommand(new PlaceBuildingCommand(CurrentTick, factionId, buildingType, position));
+    }
+
+    public Result IssueConstructOrder(FactionId factionId, EntityId[] workerIds, EntityId buildingId)
+    {
+        return DispatchCommand(new ConstructBuildingCommand(CurrentTick, factionId, workerIds, buildingId));
+    }
+
+    public Result IssueQueueProductionOrder(FactionId factionId, EntityId buildingId, string unitType)
+    {
+        return DispatchCommand(new QueueProductionCommand(CurrentTick, factionId, buildingId, unitType));
+    }
+
+    public Result IssueCancelProductionOrder(FactionId factionId, EntityId buildingId, int queueIndex)
+    {
+        return DispatchCommand(new CancelProductionCommand(CurrentTick, factionId, buildingId, queueIndex));
+    }
+
+    public ResourceBank GetResourceBank(FactionId factionId)
+    {
+        return _simulation.State.GetOrCreateResourceBank(factionId);
+    }
+
+    public PopulationManager GetPopulationManager(FactionId factionId)
+    {
+        return _simulation.State.GetOrCreatePopulationManager(factionId);
     }
 }

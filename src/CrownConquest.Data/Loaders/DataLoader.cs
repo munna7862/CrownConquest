@@ -82,6 +82,66 @@ public static class DataLoader
         }
     }
 
+    public static Result<List<BuildingDefinition>> LoadBuildingsFromJson(string json)
+    {
+        try
+        {
+            var buildings = JsonSerializer.Deserialize<List<BuildingDefinition>>(json, JsonOptions);
+            if (buildings == null || buildings.Count == 0)
+            {
+                return Result<List<BuildingDefinition>>.Failure(new GameError("EMPTY_DATA", "Buildings definition is empty."));
+            }
+
+            foreach (var b in buildings)
+            {
+                if (string.IsNullOrWhiteSpace(b.Id))
+                {
+                    return Result<List<BuildingDefinition>>.Failure(new GameError("INVALID_BUILDING_ID", "Building ID cannot be empty."));
+                }
+                if (b.MaxHealth <= 0 || b.GridWidth <= 0 || b.GridHeight <= 0 || b.BuildTimeTicks <= 0)
+                {
+                    return Result<List<BuildingDefinition>>.Failure(new GameError("INVALID_BUILDING_STATS", $"Invalid stats for building {b.Id}."));
+                }
+            }
+
+            return Result<List<BuildingDefinition>>.Success(buildings);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<BuildingDefinition>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<ResourceNodeDefinition>> LoadResourcesFromJson(string json)
+    {
+        try
+        {
+            var resources = JsonSerializer.Deserialize<List<ResourceNodeDefinition>>(json, JsonOptions);
+            if (resources == null || resources.Count == 0)
+            {
+                return Result<List<ResourceNodeDefinition>>.Failure(new GameError("EMPTY_DATA", "Resources definition is empty."));
+            }
+
+            foreach (var r in resources)
+            {
+                if (string.IsNullOrWhiteSpace(r.Id))
+                {
+                    return Result<List<ResourceNodeDefinition>>.Failure(new GameError("INVALID_RESOURCE_ID", "Resource ID cannot be empty."));
+                }
+                if (r.MaxAmount <= 0 || r.HarvestRadius <= 0)
+                {
+                    return Result<List<ResourceNodeDefinition>>.Failure(new GameError("INVALID_RESOURCE_STATS", $"Invalid stats for resource {r.Id}."));
+                }
+            }
+
+            return Result<List<ResourceNodeDefinition>>.Success(resources);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<ResourceNodeDefinition>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
     public static Result<List<UnitDefinition>> LoadUnitsFromFile(string filePath)
     {
         if (!File.Exists(filePath))
@@ -100,5 +160,25 @@ public static class DataLoader
         }
         string json = File.ReadAllText(filePath);
         return LoadProgressionCurvesFromJson(json);
+    }
+
+    public static Result<List<BuildingDefinition>> LoadBuildingsFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<BuildingDefinition>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadBuildingsFromJson(json);
+    }
+
+    public static Result<List<ResourceNodeDefinition>> LoadResourcesFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<ResourceNodeDefinition>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadResourcesFromJson(json);
     }
 }

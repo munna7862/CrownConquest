@@ -1,0 +1,37 @@
+[
+  {
+    "id": "tree",
+    "displayName": "Forest Tree",
+    "resourceType": "Wood",
+    "maxAmount": 300,
+    "harvestRadius": 1.8
+  },
+  {
+    "id": "gold_mine",
+    "displayName": "Gold Deposit",
+    "resourceType": "Gold",
+    "maxAmount": 800,
+    "harvestRadius": 2.2
+  },
+  {
+    "id": "berry_bush",
+    "displayName": "Berry Bush",
+    "resourceType": "Food",
+    "maxAmount": 250,
+    "harvestRadius": 1.8
+  },
+  {
+    "id": "stone_quarry",
+    "displayName": "Stone Quarry",
+    "resourceType": "Stone",
+    "maxAmount": 600,
+    "harvestRadius": 2.2
+  },
+  {
+    "id": "iron_deposit",
+    "displayName": "Iron Ore Node",
+    "resourceType": "Iron",
+    "maxAmount": 500,
+    "harvestRadius": 2.2
+  }
+]
