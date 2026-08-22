@@ -84,3 +84,39 @@ public readonly record struct PopulationCapacityChangedEvent(
     FactionId FactionId,
     int CurrentPop,
     int MaxPop) : IDomainEvent;
+
+public readonly record struct BuildingRepairProgressEvent(
+    ulong SimulationTick,
+    EntityId BuildingId,
+    float CurrentHealth,
+    float MaxHealth) : IDomainEvent;
+
+public readonly record struct BuildingRepairedEvent(
+    ulong SimulationTick,
+    EntityId BuildingId,
+    FactionId FactionId,
+    string BuildingType) : IDomainEvent;
+
+public readonly record struct FarmHarvestedEvent(
+    ulong SimulationTick,
+    EntityId WorkerId,
+    EntityId FarmId,
+    int AmountHarvested,
+    int RemainingFarmFood) : IDomainEvent;
+
+public readonly record struct FarmDepletedEvent(
+    ulong SimulationTick,
+    EntityId FarmId,
+    FactionId FactionId) : IDomainEvent;
+
+public readonly record struct FarmReseededEvent(
+    ulong SimulationTick,
+    EntityId FarmId,
+    FactionId FactionId,
+    int RestoredFood) : IDomainEvent;
+
+public readonly record struct IdleWorkersSelectedEvent(
+    ulong SimulationTick,
+    FactionId FactionId,
+    EntityId[] WorkerIds) : IDomainEvent;
+

@@ -14,6 +14,7 @@ public enum UnitState
     Gathering,
     Returning,
     Constructing,
+    Repairing,
     Dead
 }
 
@@ -34,6 +35,7 @@ public sealed class UnitEntity
 
     public WorkerGatherState? WorkerState { get; set; }
     public bool IsWorker => WorkerState != null;
+    public bool IsIdleWorker => IsWorker && State == UnitState.Idle && IsAlive;
 
     public float BaseMaxHealth { get; }
     public float HealthPerLevelBonus { get; }
@@ -143,6 +145,15 @@ public sealed class UnitEntity
         WorkerState.TaskState = WorkerTaskState.MovingToConstruct;
         AttackTargetId = EntityId.None;
         State = UnitState.Constructing;
+    }
+
+    public void AssignRepair(EntityId buildingId)
+    {
+        if (!IsAlive || WorkerState == null) return;
+        WorkerState.TargetBuildingId = buildingId;
+        WorkerState.TaskState = WorkerTaskState.MovingToRepair;
+        AttackTargetId = EntityId.None;
+        State = UnitState.Repairing;
     }
 
     public void Stop()
