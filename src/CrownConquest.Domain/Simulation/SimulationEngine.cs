@@ -24,6 +24,7 @@ public sealed class SimulationEngine
     private readonly BattlefieldBounds _bounds;
     private readonly SpatialGrid _spatialGrid;
     private readonly List<EntityId> _queryBuffer = new(64);
+    private readonly Dictionary<string, TechnologyDefinition> _techRegistry = new(StringComparer.OrdinalIgnoreCase);
 
     public ulong CurrentTick => _state.CurrentTick;
     public SimulationConfig Config => _config;
@@ -33,6 +34,7 @@ public sealed class SimulationEngine
     public SimulationState State => _state;
     public BattlefieldBounds Bounds => _bounds;
     public SpatialGrid SpatialGrid => _spatialGrid;
+    public IReadOnlyDictionary<string, TechnologyDefinition> TechRegistry => _techRegistry;
 
     public SimulationEngine(
         SimulationConfig? config = null,
@@ -46,6 +48,113 @@ public sealed class SimulationEngine
         _state = new SimulationState();
         _bounds = bounds ?? BattlefieldBounds.Default;
         _spatialGrid = new SpatialGrid(cellSize: 8.0f);
+
+        RegisterDefaultTechnologies();
+    }
+
+    public void RegisterTechnology(TechnologyDefinition tech)
+    {
+        ArgumentNullException.ThrowIfNull(tech);
+        _techRegistry[tech.Id] = tech;
+    }
+
+    public bool TryGetTechnology(string techId, out TechnologyDefinition? tech)
+    {
+        return _techRegistry.TryGetValue(techId, out tech);
+    }
+
+    private void RegisterDefaultTechnologies()
+    {
+        RegisterTechnology(new TechnologyDefinition(
+            "forging",
+            "Forging",
+            "Increases infantry and cavalry melee attack damage by +2.",
+            TechCategory.Military,
+            CivilizationEra.Classical,
+            new ResourceCost(Food: 150, Gold: 50),
+            researchDurationTicks: 40,
+            new TechModifiers(MeleeAttackBonus: 2, CavalryAttackBonus: 2),
+            requiredBuildingTypes: new[] { "blacksmith" }));
+
+        RegisterTechnology(new TechnologyDefinition(
+            "iron_weapons",
+            "Iron Weapons",
+            "Increases infantry and cavalry melee attack damage by an additional +3.",
+            TechCategory.Military,
+            CivilizationEra.Imperial,
+            new ResourceCost(Food: 220, Gold: 120, Iron: 50),
+            researchDurationTicks: 60,
+            new TechModifiers(MeleeAttackBonus: 3, CavalryAttackBonus: 3),
+            requiredTechIds: new[] { "forging" },
+            requiredBuildingTypes: new[] { "blacksmith" }));
+
+        RegisterTechnology(new TechnologyDefinition(
+            "scale_armor",
+            "Scale Armor",
+            "Increases infantry and cavalry armor by +2.",
+            TechCategory.Military,
+            CivilizationEra.Classical,
+            new ResourceCost(Food: 100, Gold: 100),
+            researchDurationTicks: 40,
+            new TechModifiers(MeleeArmorBonus: 2, CavalryArmorBonus: 2),
+            requiredBuildingTypes: new[] { "blacksmith" }));
+
+        RegisterTechnology(new TechnologyDefinition(
+            "plate_armor",
+            "Plate Armor",
+            "Increases infantry and cavalry armor by an additional +3.",
+            TechCategory.Military,
+            CivilizationEra.Imperial,
+            new ResourceCost(Food: 250, Gold: 200, Iron: 80),
+            researchDurationTicks: 60,
+            new TechModifiers(MeleeArmorBonus: 3, CavalryArmorBonus: 3),
+            requiredTechIds: new[] { "scale_armor" },
+            requiredBuildingTypes: new[] { "blacksmith" }));
+
+        RegisterTechnology(new TechnologyDefinition(
+            "fletching",
+            "Fletching",
+            "Archers gain +1 attack damage and +1.0 attack range.",
+            TechCategory.Military,
+            CivilizationEra.Classical,
+            new ResourceCost(Food: 100, Wood: 50, Gold: 50),
+            researchDurationTicks: 40,
+            new TechModifiers(RangedAttackBonus: 1, RangedRangeBonus: 1.0f),
+            requiredBuildingTypes: new[] { "blacksmith" }));
+
+        RegisterTechnology(new TechnologyDefinition(
+            "bodkin_arrow",
+            "Bodkin Arrow",
+            "Archers gain an additional +2 attack damage and +1.5 attack range.",
+            TechCategory.Military,
+            CivilizationEra.Imperial,
+            new ResourceCost(Food: 200, Wood: 100, Gold: 100),
+            researchDurationTicks: 50,
+            new TechModifiers(RangedAttackBonus: 2, RangedRangeBonus: 1.5f),
+            requiredTechIds: new[] { "fletching" },
+            requiredBuildingTypes: new[] { "blacksmith" }));
+
+        RegisterTechnology(new TechnologyDefinition(
+            "double_bit_axe",
+            "Double-Bit Axe",
+            "Workers gather resources +20% faster.",
+            TechCategory.Economy,
+            CivilizationEra.Classical,
+            new ResourceCost(Food: 100, Wood: 50),
+            researchDurationTicks: 35,
+            new TechModifiers(GatherRateBonus: 0.20f),
+            requiredBuildingTypes: new[] { "town_center" }));
+
+        RegisterTechnology(new TechnologyDefinition(
+            "husbandry",
+            "Husbandry",
+            "Cavalry units move +1.0 speed faster.",
+            TechCategory.Military,
+            CivilizationEra.Classical,
+            new ResourceCost(Food: 150),
+            researchDurationTicks: 35,
+            new TechModifiers(CavalrySpeedBonus: 1.0f),
+            requiredBuildingTypes: new[] { "stable" }));
     }
 
     /// <summary>
@@ -74,10 +183,16 @@ public sealed class SimulationEngine
         // 6. Update building production queues
         UpdateProduction(tick);
 
-        // 7. Update population counts and capacities
+        // 7. Update building research queues
+        UpdateResearch(tick);
+
+        // 8. Update era advancement state machines
+        UpdateEraAdvancement(tick);
+
+        // 9. Update population counts and capacities
         UpdatePopulation(tick);
 
-        // 8. Cleanup deceased entities and depleted nodes at tick boundary
+        // 10. Cleanup deceased entities and depleted nodes at tick boundary
         CleanupEntities();
     }
 
@@ -112,7 +227,8 @@ public sealed class SimulationEngine
 
                 WorkerGatherState? workerState = null;
                 if (spawn.UnitType.Equals("villager", StringComparison.OrdinalIgnoreCase) ||
-                    spawn.UnitType.Equals("worker", StringComparison.OrdinalIgnoreCase))
+                    spawn.UnitType.Equals("worker", StringComparison.OrdinalIgnoreCase) ||
+                    spawn.UnitType.Equals("plebeian", StringComparison.OrdinalIgnoreCase))
                 {
                     workerState = new WorkerGatherState(carryCapacity: 10, harvestRatePerTick: 0.5f, buildPowerPerTick: 1.0f);
                 }
@@ -285,6 +401,30 @@ public sealed class SimulationEngine
                 _eventBus.Publish(new UnitsSelectedEvent(tick, selectIdle.FactionId, idleIds));
                 break;
             }
+
+            case AdvanceEraCommand advanceEra:
+            {
+                ExecuteAdvanceEra(advanceEra, tick);
+                break;
+            }
+
+            case CancelEraAdvancementCommand cancelEra:
+            {
+                ExecuteCancelEraAdvancement(cancelEra, tick);
+                break;
+            }
+
+            case StartResearchCommand startResearch:
+            {
+                ExecuteStartResearch(startResearch, tick);
+                break;
+            }
+
+            case CancelResearchCommand cancelResearch:
+            {
+                ExecuteCancelResearch(cancelResearch, tick);
+                break;
+            }
         }
     }
 
@@ -403,6 +543,158 @@ public sealed class SimulationEngine
         }
     }
 
+    private void ExecuteAdvanceEra(AdvanceEraCommand cmd, ulong tick)
+    {
+        var eraState = _state.GetOrCreateEraState(cmd.FactionId);
+        if (!eraState.CanAdvance(cmd.TargetEra, out string reason))
+        {
+            SimLogger.LogDebug("Simulation", $"Cannot advance era: {reason}");
+            return;
+        }
+
+        if (!_state.TryGetBuilding(cmd.BuildingId, out var building) || building == null ||
+            building.FactionId != cmd.FactionId || !building.IsConstructed || !building.IsAlive ||
+            !building.BuildingType.Equals("town_center", StringComparison.OrdinalIgnoreCase))
+        {
+            SimLogger.LogDebug("Simulation", "Era advancement must take place at a constructed Town Center.");
+            return;
+        }
+
+        var eraConfig = GetEraConfig(cmd.TargetEra);
+
+        // Verify building prerequisites
+        foreach (var reqBuilding in eraConfig.RequiredBuildingTypes)
+        {
+            bool hasBuilding = false;
+            foreach (var b in _state.ActiveBuildings)
+            {
+                if (b.FactionId == cmd.FactionId && b.IsConstructed && b.IsAlive &&
+                    b.BuildingType.Equals(reqBuilding, StringComparison.OrdinalIgnoreCase))
+                {
+                    hasBuilding = true;
+                    break;
+                }
+            }
+
+            if (!hasBuilding)
+            {
+                SimLogger.LogDebug("Simulation", $"Cannot advance era: Missing required building {reqBuilding}.");
+                return;
+            }
+        }
+
+        var bank = _state.GetOrCreateResourceBank(cmd.FactionId);
+        if (!bank.TryDeduct(eraConfig.Cost, tick, _eventBus, $"Advance to {cmd.TargetEra}"))
+        {
+            SimLogger.LogDebug("Simulation", "Cannot advance era: Insufficient resources.");
+            return;
+        }
+
+        eraState.TryStartAdvancement(cmd.TargetEra, eraConfig.DurationTicks, cmd.BuildingId, eraConfig.Cost, tick, _eventBus);
+        SimLogger.LogInfo("Simulation", $"Faction {cmd.FactionId} started advancement to {cmd.TargetEra}.");
+    }
+
+    private void ExecuteCancelEraAdvancement(CancelEraAdvancementCommand cmd, ulong tick)
+    {
+        var eraState = _state.GetOrCreateEraState(cmd.FactionId);
+        var refund = eraState.CancelAdvancement(tick, _eventBus);
+        if (!refund.IsZero)
+        {
+            var bank = _state.GetOrCreateResourceBank(cmd.FactionId);
+            if (refund.Food > 0) bank.Deposit(ResourceType.Food, refund.Food, tick, _eventBus);
+            if (refund.Wood > 0) bank.Deposit(ResourceType.Wood, refund.Wood, tick, _eventBus);
+            if (refund.Gold > 0) bank.Deposit(ResourceType.Gold, refund.Gold, tick, _eventBus);
+            if (refund.Stone > 0) bank.Deposit(ResourceType.Stone, refund.Stone, tick, _eventBus);
+            if (refund.Iron > 0) bank.Deposit(ResourceType.Iron, refund.Iron, tick, _eventBus);
+        }
+    }
+
+    private void ExecuteStartResearch(StartResearchCommand cmd, ulong tick)
+    {
+        if (!_state.TryGetBuilding(cmd.BuildingId, out var building) || building == null ||
+            building.FactionId != cmd.FactionId || !building.IsConstructed || !building.IsAlive ||
+            building.ResearchQueue.IsFull)
+        {
+            return;
+        }
+
+        if (!TryGetTechnology(cmd.TechnologyId, out var tech) || tech == null)
+        {
+            SimLogger.LogDebug("Simulation", $"Unknown technology {cmd.TechnologyId}");
+            return;
+        }
+
+        var eraState = _state.GetOrCreateEraState(cmd.FactionId);
+        var techManager = _state.GetOrCreateTechManager(cmd.FactionId);
+
+        if (!techManager.CanResearch(tech, eraState.CurrentEra, _state.ActiveBuildings, out string reason))
+        {
+            SimLogger.LogDebug("Simulation", $"Cannot research {tech.DisplayName}: {reason}");
+            return;
+        }
+
+        // Check if already queued in this or another building
+        foreach (var b in _state.ActiveBuildings)
+        {
+            if (b.FactionId == cmd.FactionId)
+            {
+                foreach (var item in b.ResearchQueue.Items)
+                {
+                    if (item.TechnologyId.Equals(tech.Id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        SimLogger.LogDebug("Simulation", $"Technology {tech.DisplayName} is already queued.");
+                        return;
+                    }
+                }
+            }
+        }
+
+        var bank = _state.GetOrCreateResourceBank(cmd.FactionId);
+        if (!bank.TryDeduct(tech.Cost, tick, _eventBus, $"Research {tech.DisplayName}"))
+        {
+            SimLogger.LogDebug("Simulation", $"Cannot research {tech.DisplayName}: Insufficient resources.");
+            return;
+        }
+
+        var queueItem = new ResearchQueueItem(tech, tech.ResearchDurationTicks, tech.Cost);
+        if (building.ResearchQueue.TryEnqueue(queueItem))
+        {
+            _eventBus.Publish(new TechnologyResearchStartedEvent(
+                tick,
+                cmd.FactionId,
+                building.Id,
+                tech.Id,
+                tech.ResearchDurationTicks));
+            SimLogger.LogInfo("Simulation", $"Faction {cmd.FactionId} started research on {tech.DisplayName} at building {building.Id}.");
+        }
+    }
+
+    private void ExecuteCancelResearch(CancelResearchCommand cmd, ulong tick)
+    {
+        if (!_state.TryGetBuilding(cmd.BuildingId, out var building) || building == null || building.FactionId != cmd.FactionId)
+        {
+            return;
+        }
+
+        var item = building.ResearchQueue.CancelAt(cmd.QueueIndex);
+        if (item != null)
+        {
+            var bank = _state.GetOrCreateResourceBank(cmd.FactionId);
+            if (item.Cost.Food > 0) bank.Deposit(ResourceType.Food, item.Cost.Food, tick, _eventBus);
+            if (item.Cost.Wood > 0) bank.Deposit(ResourceType.Wood, item.Cost.Wood, tick, _eventBus);
+            if (item.Cost.Gold > 0) bank.Deposit(ResourceType.Gold, item.Cost.Gold, tick, _eventBus);
+            if (item.Cost.Stone > 0) bank.Deposit(ResourceType.Stone, item.Cost.Stone, tick, _eventBus);
+            if (item.Cost.Iron > 0) bank.Deposit(ResourceType.Iron, item.Cost.Iron, tick, _eventBus);
+
+            _eventBus.Publish(new TechnologyResearchCancelledEvent(
+                tick,
+                cmd.FactionId,
+                building.Id,
+                item.TechnologyId,
+                item.Cost));
+        }
+    }
+
     private void UpdateWorkerTasks(ulong tick)
     {
         float dt = _config.DeltaTime;
@@ -415,6 +707,7 @@ public sealed class SimulationEngine
             if (!unit.IsAlive || unit.WorkerState == null) continue;
 
             var worker = unit.WorkerState;
+            var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
 
             switch (worker.TaskState)
             {
@@ -449,46 +742,15 @@ public sealed class SimulationEngine
                     }
                     else
                     {
-                        // Target depleted/missing -> check if farm can be reseeded
-                        if (_state.TryGetBuilding(worker.TargetResourceNodeId, out var depFarm) && depFarm != null && depFarm.IsFarm && depFarm.IsAlive)
+                        // Target node/farm is depleted or missing -> search for nearby matching resource
+                        var nearestTarget = FindNearestGatherTarget(unit.Position, worker.CarriedResourceType, unit.FactionId);
+                        if (nearestTarget.IsValid)
                         {
-                            var bank = _state.GetOrCreateResourceBank(unit.FactionId);
-                            if (bank.TryDeduct(new ResourceCost(Wood: depFarm.FarmReseedCost), tick, _eventBus, "Auto-Reseed Farm"))
-                            {
-                                depFarm.ReseedFarm(tick, _eventBus);
-                                worker.TaskState = WorkerTaskState.Harvesting;
-                                unit.State = UnitState.Gathering;
-                                break;
-                            }
-                        }
-
-                        if (worker.HasCarriedResources && worker.CarriedResourceType.HasValue)
-                        {
-                            var dropOff = FindNearestDropOff(unit.FactionId, unit.Position, worker.CarriedResourceType.Value);
-                            if (dropOff != null)
-                            {
-                                worker.TargetBuildingId = dropOff.Id;
-                                worker.TaskState = WorkerTaskState.ReturningToDropOff;
-                                unit.State = UnitState.Returning;
-                            }
-                            else
-                            {
-                                unit.Stop();
-                            }
+                            worker.TargetResourceNodeId = nearestTarget;
                         }
                         else
                         {
-                            var nextTarget = FindNearestGatherTarget(unit.Position, null, unit.FactionId);
-                            if (nextTarget.IsValid)
-                            {
-                                worker.TargetResourceNodeId = nextTarget;
-                                worker.TaskState = WorkerTaskState.MovingToResource;
-                                unit.State = UnitState.Gathering;
-                            }
-                            else
-                            {
-                                unit.Stop();
-                            }
+                            unit.Stop();
                         }
                     }
                     break;
@@ -498,28 +760,29 @@ public sealed class SimulationEngine
                 {
                     if (_state.TryGetResourceNode(worker.TargetResourceNodeId, out var node) && node != null && !node.IsDepleted)
                     {
-                        worker.HarvestProgressAccumulator += worker.HarvestRatePerTick;
-                        while (worker.HarvestProgressAccumulator >= 1.0f && !worker.IsInventoryFull && !node.IsDepleted)
+                        float dist = unit.Position.DistanceTo(node.Position);
+                        if (dist > node.HarvestRadius + 0.5f)
                         {
-                            int request = Math.Min((int)MathF.Floor(worker.HarvestProgressAccumulator), worker.CarryCapacity - worker.CarriedAmount);
-                            if (request <= 0) break;
-
-                            int harvested = node.Harvest(request, tick, unit.Id, _eventBus);
-                            worker.AddCarried(node.ResourceType, harvested);
-                            worker.HarvestProgressAccumulator -= harvested;
-
-                            _eventBus.Publish(new ResourceHarvestedEvent(
-                                tick,
-                                unit.Id,
-                                node.Id,
-                                node.ResourceType,
-                                harvested,
-                                worker.CarriedAmount));
+                            worker.TaskState = WorkerTaskState.MovingToResource;
+                            break;
                         }
 
-                        if (worker.IsInventoryFull || node.IsDepleted)
+                        // Apply tech gather rate modifier
+                        worker.HarvestProgressAccumulator += worker.HarvestRatePerTick * (1.0f + tech.GatherRateBonus);
+                        if (worker.HarvestProgressAccumulator >= 1.0f)
                         {
-                            var dropOff = FindNearestDropOff(unit.FactionId, unit.Position, worker.CarriedResourceType ?? node.ResourceType);
+                            int toHarvest = (int)worker.HarvestProgressAccumulator;
+                            worker.HarvestProgressAccumulator -= toHarvest;
+                            int harvested = node.Harvest(toHarvest, tick, unit.Id, _eventBus);
+                            if (harvested > 0)
+                            {
+                                worker.AddCarried(node.ResourceType, harvested);
+                            }
+                        }
+
+                        if (worker.IsInventoryFull)
+                        {
+                            var dropOff = FindNearestDropOff(unit.FactionId, unit.Position, node.ResourceType);
                             if (dropOff != null)
                             {
                                 worker.TargetBuildingId = dropOff.Id;
@@ -528,36 +791,31 @@ public sealed class SimulationEngine
                             }
                             else
                             {
-                                unit.State = UnitState.Idle;
+                                unit.Stop();
                             }
                         }
                     }
                     else if (_state.TryGetBuilding(worker.TargetResourceNodeId, out var farm) && farm != null && farm.IsFarm && farm.IsAlive && !farm.IsFarmDepleted)
                     {
-                        worker.HarvestProgressAccumulator += worker.HarvestRatePerTick;
-                        while (worker.HarvestProgressAccumulator >= 1.0f && !worker.IsInventoryFull && !farm.IsFarmDepleted)
+                        float farmRadius = MathF.Max(farm.GridSize.X, farm.GridSize.Y) * 0.5f + 1.5f;
+                        float dist = unit.Position.DistanceTo(farm.Position);
+                        if (dist > farmRadius)
                         {
-                            int request = Math.Min((int)MathF.Floor(worker.HarvestProgressAccumulator), worker.CarryCapacity - worker.CarriedAmount);
-                            if (request <= 0) break;
+                            worker.TaskState = WorkerTaskState.MovingToResource;
+                            break;
+                        }
 
-                            int harvested = farm.HarvestFarmFood(request, tick, unit.Id, _eventBus);
-                            worker.AddCarried(ResourceType.Food, harvested);
-                            worker.HarvestProgressAccumulator -= harvested;
-
-                            _eventBus.Publish(new FarmHarvestedEvent(
-                                tick,
-                                unit.Id,
-                                farm.Id,
-                                harvested,
-                                farm.FarmFoodRemaining));
-
-                            _eventBus.Publish(new ResourceHarvestedEvent(
-                                tick,
-                                unit.Id,
-                                farm.Id,
-                                ResourceType.Food,
-                                harvested,
-                                worker.CarriedAmount));
+                        worker.HarvestProgressAccumulator += worker.HarvestRatePerTick * (1.0f + tech.GatherRateBonus);
+                        if (worker.HarvestProgressAccumulator >= 1.0f)
+                        {
+                            int toHarvest = (int)worker.HarvestProgressAccumulator;
+                            worker.HarvestProgressAccumulator -= toHarvest;
+                            int harvested = farm.HarvestFarmFood(toHarvest, tick, unit.Id, _eventBus);
+                            if (harvested > 0)
+                            {
+                                worker.AddCarried(ResourceType.Food, harvested);
+                                _eventBus.Publish(new FarmHarvestedEvent(tick, unit.Id, farm.Id, harvested, farm.FarmFoodRemaining));
+                            }
                         }
 
                         if (worker.IsInventoryFull)
@@ -571,43 +829,7 @@ public sealed class SimulationEngine
                             }
                             else
                             {
-                                unit.State = UnitState.Idle;
-                            }
-                        }
-                        else if (farm.IsFarmDepleted)
-                        {
-                            var bank = _state.GetOrCreateResourceBank(unit.FactionId);
-                            if (bank.TryDeduct(new ResourceCost(Wood: farm.FarmReseedCost), tick, _eventBus, "Auto-Reseed Farm"))
-                            {
-                                farm.ReseedFarm(tick, _eventBus);
-                            }
-                            else if (worker.HasCarriedResources)
-                            {
-                                var dropOff = FindNearestDropOff(unit.FactionId, unit.Position, ResourceType.Food);
-                                if (dropOff != null)
-                                {
-                                    worker.TargetBuildingId = dropOff.Id;
-                                    worker.TaskState = WorkerTaskState.ReturningToDropOff;
-                                    unit.State = UnitState.Returning;
-                                }
-                                else
-                                {
-                                    unit.State = UnitState.Idle;
-                                }
-                            }
-                            else
-                            {
-                                var nextTarget = FindNearestGatherTarget(unit.Position, ResourceType.Food, unit.FactionId);
-                                if (nextTarget.IsValid)
-                                {
-                                    worker.TargetResourceNodeId = nextTarget;
-                                    worker.TaskState = WorkerTaskState.MovingToResource;
-                                    unit.State = UnitState.Gathering;
-                                }
-                                else
-                                {
-                                    unit.Stop();
-                                }
+                                unit.Stop();
                             }
                         }
                     }
@@ -635,17 +857,16 @@ public sealed class SimulationEngine
                             }
                             else
                             {
-                                unit.State = UnitState.Idle;
+                                unit.Stop();
                             }
                         }
                         else
                         {
-                            var nextTarget = FindNearestGatherTarget(unit.Position, null, unit.FactionId);
+                            var nextTarget = FindNearestGatherTarget(unit.Position, worker.CarriedResourceType, unit.FactionId);
                             if (nextTarget.IsValid)
                             {
                                 worker.TargetResourceNodeId = nextTarget;
                                 worker.TaskState = WorkerTaskState.MovingToResource;
-                                unit.State = UnitState.Gathering;
                             }
                             else
                             {
@@ -658,38 +879,40 @@ public sealed class SimulationEngine
 
                 case WorkerTaskState.ReturningToDropOff:
                 {
-                    if (_state.TryGetBuilding(worker.TargetBuildingId, out var dropOff) &&
-                        dropOff != null && dropOff.IsAlive &&
-                        worker.CarriedResourceType.HasValue &&
-                        dropOff.AcceptsDropOff(worker.CarriedResourceType.Value))
+                    if (_state.TryGetBuilding(worker.TargetBuildingId, out var dropOff) && dropOff != null && dropOff.IsAlive && dropOff.IsConstructed)
                     {
-                        float dropRadius = MathF.Max(dropOff.GridSize.X, dropOff.GridSize.Y) * 0.5f + 1.2f;
+                        float dropOffRadius = MathF.Max(dropOff.GridSize.X, dropOff.GridSize.Y) * 0.5f + 1.2f;
                         float dist = unit.Position.DistanceTo(dropOff.Position);
 
-                        if (dist <= dropRadius)
+                        if (dist <= dropOffRadius)
                         {
-                            // Deposit resources into faction bank
-                            var carried = worker.EmptyInventory();
-                            if (carried.HasValue)
+                            if (worker.HasCarriedResources && worker.CarriedResourceType.HasValue)
                             {
+                                var resType = worker.CarriedResourceType.Value;
+                                int amount = worker.CarriedAmount;
                                 var bank = _state.GetOrCreateResourceBank(unit.FactionId);
-                                bank.Deposit(carried.Value.Type, carried.Value.Amount, tick, _eventBus, unit.Id);
+                                bank.Deposit(resType, amount, tick, _eventBus);
+
+                                _eventBus.Publish(new ResourceDepositedEvent(
+                                    tick,
+                                    unit.FactionId,
+                                    unit.Id,
+                                    resType,
+                                    amount,
+                                    bank.GetAmount(resType)));
+
+                                worker.EmptyInventory();
                             }
 
-                            // Return to resource gathering
-                            if (_state.TryGetResourceNode(worker.TargetResourceNodeId, out var prevNode) && prevNode != null && !prevNode.IsDepleted)
-                            {
-                                worker.TaskState = WorkerTaskState.MovingToResource;
-                                unit.State = UnitState.Gathering;
-                            }
-                            else if (_state.TryGetBuilding(worker.TargetResourceNodeId, out var prevFarm) && prevFarm != null && prevFarm.IsFarm && prevFarm.IsAlive && (!prevFarm.IsFarmDepleted || _state.GetOrCreateResourceBank(unit.FactionId).CanAfford(new ResourceCost(Wood: prevFarm.FarmReseedCost))))
+                            // Return to gathering
+                            if (worker.TargetResourceNodeId.IsValid)
                             {
                                 worker.TaskState = WorkerTaskState.MovingToResource;
                                 unit.State = UnitState.Gathering;
                             }
                             else
                             {
-                                var nextTarget = FindNearestGatherTarget(unit.Position, carried?.Type, unit.FactionId);
+                                var nextTarget = FindNearestGatherTarget(unit.Position, null, unit.FactionId);
                                 if (nextTarget.IsValid)
                                 {
                                     worker.TargetResourceNodeId = nextTarget;
@@ -859,7 +1082,9 @@ public sealed class SimulationEngine
     private void MoveUnitTowards(UnitEntity unit, Vector2D destination, float dt, ulong tick)
     {
         var prevPos = unit.Position;
-        float maxDist = unit.MovementSpeed * dt;
+        var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
+        float effectiveSpeed = unit.MovementSpeed + (unit.Archetype == UnitArchetype.Cavalry ? tech.CavalrySpeedBonus : 0f);
+        float maxDist = effectiveSpeed * dt;
         var nextPos = unit.Position.MoveTowards(destination, maxDist);
         nextPos = _bounds.Clamp(nextPos);
 
@@ -978,8 +1203,8 @@ public sealed class SimulationEngine
                 var unitId = _state.GenerateEntityId();
 
                 UnitEntity producedUnit;
-                if (item.UnitType.Equals("villager", StringComparison.OrdinalIgnoreCase) ||
-                    item.UnitType.Equals("worker", StringComparison.OrdinalIgnoreCase))
+                var lower = item.UnitType.ToLowerInvariant();
+                if (lower.Contains("villager") || lower.Contains("worker") || lower.Contains("plebeian"))
                 {
                     producedUnit = new UnitEntity(
                         unitId,
@@ -994,20 +1219,93 @@ public sealed class SimulationEngine
                         killXpValue: 20,
                         workerState: new WorkerGatherState(carryCapacity: 10, harvestRatePerTick: 0.5f, buildPowerPerTick: 1.0f));
                 }
-                else
+                else if (lower.Contains("archer") || lower.Contains("sagittarius") || lower.Contains("bowman") || lower.Contains("veles"))
                 {
-                    // Swordsman / Military unit
+                    producedUnit = new UnitEntity(
+                        unitId,
+                        building.FactionId,
+                        item.UnitType,
+                        spawnPos,
+                        maxHealth: 80f,
+                        attackDamage: 14f,
+                        attackRange: 8.0f,
+                        movementSpeed: 3.8f,
+                        attackCooldownTicks: 22,
+                        killXpValue: 50,
+                        baseArmor: 1.0f,
+                        attackType: "ranged",
+                        aggroRange: 12.0f,
+                        archetype: UnitArchetype.Archer);
+                }
+                else if (lower.Contains("spearman") || lower.Contains("triarius") || lower.Contains("hoplite"))
+                {
                     producedUnit = new UnitEntity(
                         unitId,
                         building.FactionId,
                         item.UnitType,
                         spawnPos,
                         maxHealth: 100f,
-                        attackDamage: 15f,
+                        attackDamage: 12f,
+                        attackRange: 1.6f,
+                        movementSpeed: 3.7f,
+                        attackCooldownTicks: 18,
+                        killXpValue: 50,
+                        baseArmor: 2.0f,
+                        attackType: "melee",
+                        aggroRange: 10.0f,
+                        archetype: UnitArchetype.Spearman);
+                }
+                else if (lower.Contains("cavalry") || lower.Contains("scout") || lower.Contains("equite") || lower.Contains("horseman"))
+                {
+                    bool isHeavy = lower.Contains("heavy");
+                    producedUnit = new UnitEntity(
+                        unitId,
+                        building.FactionId,
+                        item.UnitType,
+                        spawnPos,
+                        maxHealth: isHeavy ? 180f : 110f,
+                        attackDamage: isHeavy ? 22f : 12f,
                         attackRange: 1.5f,
-                        movementSpeed: 3.5f,
+                        movementSpeed: isHeavy ? 4.8f : 5.5f,
+                        attackCooldownTicks: isHeavy ? 20 : 16,
+                        killXpValue: isHeavy ? 100 : 65,
+                        baseArmor: isHeavy ? 5.0f : 2.0f,
+                        attackType: "melee",
+                        aggroRange: 14.0f,
+                        archetype: UnitArchetype.Cavalry);
+                }
+                else if (lower.Contains("legionary"))
+                {
+                    producedUnit = new UnitEntity(
+                        unitId,
+                        building.FactionId,
+                        item.UnitType,
+                        spawnPos,
+                        maxHealth: 140f,
+                        attackDamage: 16f,
+                        attackRange: 1.5f,
+                        movementSpeed: 3.2f,
                         attackCooldownTicks: 20,
-                        killXpValue: 50);
+                        killXpValue: 70,
+                        baseArmor: 5.0f,
+                        archetype: UnitArchetype.Infantry);
+                }
+                else
+                {
+                    // Default Swordsman
+                    producedUnit = new UnitEntity(
+                        unitId,
+                        building.FactionId,
+                        item.UnitType,
+                        spawnPos,
+                        maxHealth: 120f,
+                        attackDamage: 18f,
+                        attackRange: 1.5f,
+                        movementSpeed: 3.6f,
+                        attackCooldownTicks: 18,
+                        killXpValue: 60,
+                        baseArmor: 3.0f,
+                        archetype: UnitArchetype.Infantry);
                 }
 
                 _state.AddUnit(producedUnit);
@@ -1016,6 +1314,53 @@ public sealed class SimulationEngine
                 _eventBus.Publish(new UnitSpawnedEvent(tick, unitId, building.FactionId, item.UnitType, producedUnit.Position));
                 _eventBus.Publish(new ProductionCompletedEvent(tick, building.Id, building.FactionId, item.UnitType, unitId));
                 SimLogger.LogInfo("Production", $"Trained unit {item.UnitType} {unitId} at {spawnPos}.");
+            }
+        }
+    }
+
+    private void UpdateResearch(ulong tick)
+    {
+        var buildings = _state.ActiveBuildings;
+        int count = buildings.Count;
+
+        for (int i = 0; i < count; i++)
+        {
+            var b = buildings[i];
+            if (!b.IsAlive || !b.IsConstructed || b.ResearchQueue.IsEmpty) continue;
+
+            var item = b.ResearchQueue.CurrentItem;
+            if (item == null) continue;
+
+            item.AdvanceTicks(1);
+            _eventBus.Publish(new TechnologyResearchProgressEvent(
+                tick,
+                b.FactionId,
+                b.Id,
+                item.TechnologyId,
+                item.ProgressTicks,
+                item.TotalDurationTicks));
+
+            if (item.IsCompleted)
+            {
+                b.ResearchQueue.TryDequeue();
+                var techManager = _state.GetOrCreateTechManager(b.FactionId);
+                techManager.TryUnlockTechnology(item.Technology, b.Id, tick, _eventBus);
+                SimLogger.LogInfo("Simulation", $"Faction {b.FactionId} completed research: {item.Technology.DisplayName}");
+            }
+        }
+    }
+
+    private void UpdateEraAdvancement(ulong tick)
+    {
+        foreach (var (factionId, eraState) in _state.EraStates)
+        {
+            if (eraState.IsAdvancing)
+            {
+                eraState.AdvanceTicks(1, tick, _eventBus, out bool completed);
+                if (completed)
+                {
+                    SimLogger.LogInfo("Simulation", $"Faction {factionId} reached {eraState.CurrentEra.GetDisplayName()}!");
+                }
             }
         }
     }
@@ -1100,7 +1445,9 @@ public sealed class SimulationEngine
             if (unit.State == UnitState.Moving && unit.MoveTarget.HasValue)
             {
                 var prevPos = unit.Position;
-                float maxDistance = unit.MovementSpeed * dt;
+                var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
+                float effectiveSpeed = unit.MovementSpeed + (unit.Archetype == UnitArchetype.Cavalry ? tech.CavalrySpeedBonus : 0f);
+                float maxDistance = effectiveSpeed * dt;
                 var target = _bounds.Clamp(unit.MoveTarget.Value);
                 var nextPos = unit.Position.MoveTowards(target, maxDistance);
                 nextPos = _bounds.Clamp(nextPos);
@@ -1142,9 +1489,17 @@ public sealed class SimulationEngine
                     continue;
                 }
 
-                if (!CombatFormulas.IsInRange(unit.Position, target.Position, unit.AttackRange))
+                var attackerTech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
+                var targetTech = _state.GetOrCreateTechManager(target.FactionId).Modifiers;
+
+                float rangeBonus = unit.Archetype == UnitArchetype.Archer ? attackerTech.RangedRangeBonus : 0f;
+                float effectiveRange = unit.AttackRange + rangeBonus;
+
+                if (!CombatFormulas.IsInRange(unit.Position, target.Position, effectiveRange))
                 {
-                    float maxDistance = unit.MovementSpeed * dt;
+                    var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
+                    float effectiveSpeed = unit.MovementSpeed + (unit.Archetype == UnitArchetype.Cavalry ? tech.CavalrySpeedBonus : 0f);
+                    float maxDistance = effectiveSpeed * dt;
                     var prevPos = unit.Position;
                     var nextPos = unit.Position.MoveTowards(target.Position, maxDistance);
                     nextPos = _bounds.Clamp(nextPos);
@@ -1156,7 +1511,16 @@ public sealed class SimulationEngine
                 else if (unit.CooldownRemaining <= 0)
                 {
                     unit.ResetCooldown();
-                    target.TakeDamage(unit.AttackDamage, unit.Id, unit.FactionId, tick, _eventBus, out bool killed);
+
+                    float calculatedDamage = CombatFormulas.CalculateCombatDamage(
+                        unit.Archetype,
+                        unit.AttackDamage,
+                        attackerTech,
+                        target.Archetype,
+                        target.Armor,
+                        targetTech);
+
+                    target.TakeCombatDamage(calculatedDamage, unit.Id, unit.FactionId, tick, _eventBus, out bool killed);
 
                     if (killed)
                     {
@@ -1237,7 +1601,7 @@ public sealed class SimulationEngine
         return list.ToArray();
     }
 
-    private static (Vector2D GridSize, float MaxHealth, float BuildTimeTicks, int PopulationProvided, ResourceCost Cost, ResourceType[] AcceptedDropOffs) GetBuildingConfig(string buildingType)
+    public static (Vector2D GridSize, float MaxHealth, float BuildTimeTicks, int PopulationProvided, ResourceCost Cost, ResourceType[] AcceptedDropOffs) GetBuildingConfig(string buildingType)
     {
         return buildingType.ToLowerInvariant() switch
         {
@@ -1263,6 +1627,30 @@ public sealed class SimulationEngine
                 80f,
                 0,
                 new ResourceCost(Wood: 150),
+                Array.Empty<ResourceType>()),
+
+            "blacksmith" => (
+                new Vector2D(3f, 3f),
+                750f,
+                80f,
+                0,
+                new ResourceCost(Wood: 150, Iron: 50),
+                Array.Empty<ResourceType>()),
+
+            "archery_range" or "archery" => (
+                new Vector2D(3f, 3f),
+                700f,
+                80f,
+                0,
+                new ResourceCost(Wood: 175),
+                Array.Empty<ResourceType>()),
+
+            "stable" or "stables" => (
+                new Vector2D(3f, 3f),
+                800f,
+                90f,
+                0,
+                new ResourceCost(Wood: 175),
                 Array.Empty<ResourceType>()),
 
             "storage_pit" => (
@@ -1331,34 +1719,66 @@ public sealed class SimulationEngine
         };
     }
 
-    private static (ResourceCost Cost, int DurationTicks, int PopulationCost) GetUnitProductionConfig(string unitType)
+    public static (ResourceCost Cost, int DurationTicks, int PopulationCost) GetUnitProductionConfig(string unitType)
     {
-        return unitType.ToLowerInvariant() switch
+        var lower = unitType.ToLowerInvariant();
+        if (lower.Contains("villager") || lower.Contains("worker") || lower.Contains("plebeian"))
         {
-            "villager" or "worker" => (
-                new ResourceCost(Food: 50),
-                50,
-                1),
+            return (new ResourceCost(Food: 50), 50, 1);
+        }
+        if (lower.Contains("celtic_archer") || lower.Contains("roman_archer") || lower.Contains("archer") || lower.Contains("sagittarius") || lower.Contains("bowman"))
+        {
+            return (new ResourceCost(Food: 40, Wood: 35), 60, 1);
+        }
+        if (lower.Contains("spearman") || lower.Contains("triarius") || lower.Contains("hoplite"))
+        {
+            return (new ResourceCost(Food: 50, Gold: 25), 65, 1);
+        }
+        if (lower.Contains("heavy_cavalry") || lower.Contains("knight"))
+        {
+            return (new ResourceCost(Food: 90, Gold: 100), 110, 1);
+        }
+        if (lower.Contains("scout_cavalry") || lower.Contains("scout"))
+        {
+            return (new ResourceCost(Food: 75, Gold: 50), 80, 1);
+        }
+        if (lower.Contains("equite"))
+        {
+            return (new ResourceCost(Food: 80, Gold: 80), 100, 1);
+        }
+        if (lower.Contains("legionary"))
+        {
+            return (new ResourceCost(Food: 60, Iron: 25), 65, 1);
+        }
+        if (lower.Contains("veles"))
+        {
+            return (new ResourceCost(Food: 40, Gold: 40), 70, 1);
+        }
 
-            "swordsman" => (
-                new ResourceCost(Food: 60, Iron: 20),
-                60,
-                1),
+        // Default Swordsman
+        return (new ResourceCost(Food: 60, Iron: 20), 60, 1);
+    }
 
-            "archer" => (
-                new ResourceCost(Food: 40, Wood: 35),
-                60,
-                1),
+    public static (ResourceCost Cost, int DurationTicks, string[] RequiredBuildingTypes) GetEraConfig(CivilizationEra targetEra)
+    {
+        return targetEra switch
+        {
+            CivilizationEra.Classical => (
+                new ResourceCost(Food: 500, Gold: 200),
+                100,
+                new[] { "town_center", "barracks" }),
 
-            "legionary" => (
-                new ResourceCost(Food: 60, Iron: 25),
-                65,
-                1),
+            CivilizationEra.Imperial => (
+                new ResourceCost(Food: 800, Gold: 500),
+                150,
+                new[] { "blacksmith", "stable" }),
 
-            _ => (
-                new ResourceCost(Food: 50),
-                50,
-                1)
+            CivilizationEra.Feudal => (
+                new ResourceCost(Food: 1000, Gold: 800),
+                200,
+                new[] { "town_center" }),
+
+            _ => (ResourceCost.Zero, 0, Array.Empty<string>())
         };
     }
 }

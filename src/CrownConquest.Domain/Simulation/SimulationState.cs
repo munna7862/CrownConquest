@@ -7,7 +7,7 @@ using CrownConquest.Domain.Entities;
 namespace CrownConquest.Domain.Simulation;
 
 /// <summary>
-/// Authoritative simulation state snapshot containing all entities, economies, and world state.
+/// Authoritative simulation state snapshot containing all entities, economies, eras, tech trees, and world state.
 /// </summary>
 public sealed class SimulationState
 {
@@ -23,6 +23,8 @@ public sealed class SimulationState
 
     private readonly Dictionary<FactionId, ResourceBank> _resourceBanks = new(8);
     private readonly Dictionary<FactionId, PopulationManager> _populationManagers = new(8);
+    private readonly Dictionary<FactionId, EraState> _eraStates = new(8);
+    private readonly Dictionary<FactionId, FactionTechManager> _techManagers = new(8);
 
     public PlacementGrid PlacementGrid { get; } = new(cellSize: 1.0f);
 
@@ -38,6 +40,8 @@ public sealed class SimulationState
 
     public IReadOnlyDictionary<FactionId, ResourceBank> ResourceBanks => _resourceBanks;
     public IReadOnlyDictionary<FactionId, PopulationManager> PopulationManagers => _populationManagers;
+    public IReadOnlyDictionary<FactionId, EraState> EraStates => _eraStates;
+    public IReadOnlyDictionary<FactionId, FactionTechManager> TechManagers => _techManagers;
 
     public EntityId GenerateEntityId() => new(_nextEntityId++);
 
@@ -59,6 +63,26 @@ public sealed class SimulationState
             _populationManagers[factionId] = manager;
         }
         return manager;
+    }
+
+    public EraState GetOrCreateEraState(FactionId factionId)
+    {
+        if (!_eraStates.TryGetValue(factionId, out var eraState))
+        {
+            eraState = new EraState(factionId);
+            _eraStates[factionId] = eraState;
+        }
+        return eraState;
+    }
+
+    public FactionTechManager GetOrCreateTechManager(FactionId factionId)
+    {
+        if (!_techManagers.TryGetValue(factionId, out var techManager))
+        {
+            techManager = new FactionTechManager(factionId);
+            _techManagers[factionId] = techManager;
+        }
+        return techManager;
     }
 
     public void AddUnit(UnitEntity unit)
@@ -167,6 +191,7 @@ public sealed class SimulationState
             hash = (hash ^ (ulong)BitConverter.SingleToInt32Bits(b.CurrentHealth)) * 1099511628211UL;
             hash = (hash ^ (ulong)BitConverter.SingleToInt32Bits(b.CurrentBuildProgress)) * 1099511628211UL;
             hash = (hash ^ (ulong)b.ProductionQueue.Count) * 1099511628211UL;
+            hash = (hash ^ (ulong)b.ResearchQueue.Count) * 1099511628211UL;
         }
 
         // Resource nodes checksum
@@ -186,6 +211,21 @@ public sealed class SimulationState
             hash = (hash ^ (ulong)bank.Gold) * 1099511628211UL;
             hash = (hash ^ (ulong)bank.Stone) * 1099511628211UL;
             hash = (hash ^ (ulong)bank.Iron) * 1099511628211UL;
+        }
+
+        // Eras checksum
+        foreach (var (factionId, eraState) in _eraStates)
+        {
+            hash = (hash ^ (ulong)factionId.Value) * 1099511628211UL;
+            hash = (hash ^ (ulong)eraState.CurrentEra) * 1099511628211UL;
+            hash = (hash ^ (ulong)eraState.ProgressTicks) * 1099511628211UL;
+        }
+
+        // Tech checksum
+        foreach (var (factionId, techManager) in _techManagers)
+        {
+            hash = (hash ^ (ulong)factionId.Value) * 1099511628211UL;
+            hash = (hash ^ (ulong)techManager.UnlockedTechIds.Count) * 1099511628211UL;
         }
 
         return hash;
