@@ -64,7 +64,20 @@ graph TD
 - **Zero Real-Time Sleeps:** Never use `Thread.Sleep()`, `Task.Delay()`, or wall-clock timers for simulation tests. Step the simulation deterministically using fixed tick counts (`SimulateTicks(int count)`).
 - **Deterministic Randomness:** All procedural generators, AI decisions, and combat variance must utilize explicit seeded random number generators (`System.Random(seed)`).
 
+### 4.3 Zero-Regression Protocol & Continuous Test Baselines
+To ensure that new gameplay mechanics never break previous systems (e.g. Economy, Eras, Tech trees, Unit combat, RPG heroes):
+1. **Cumulative Test Suite Execution:** Every sprint MUST execute the entire cumulative test suite (`dotnet test`). The test runner must execute:
+   $$\text{Total Tests} = \text{All Historical Regression Tests} + \text{New Sprint Tests}$$
+   A sprint gate fails if even a single historical test fails, regresses, or is skipped.
+2. **Deterministic Replay Parity (1,000 Ticks):** Every sprint maintains an automated 1,000-tick headless simulation test comparing bit-for-bit 64-bit state checksums across dual seeded runs (`seed = X`).
+3. **Save/Load Roundtrip Integrity:** State serialization must preserve all entity types, resources, active research, cooldowns, and attributes. Serializing at tick $N$ and reloading must produce identical subsequent simulation states.
+4. **Zero-Allocation Hot-Loop Guard:** Simulation loops (`Tick`, `UpdateUnits`, `UpdateCombat`, `UpdateEconomy`, `UpdateHeroes`) must maintain 0 dynamic heap allocations per tick in continuous playouts.
+5. **Dual-Gate Verification (Kickoff & Release):**
+   - **Stage 1 (Kickoff):** SDE executes baseline `dotnet test` on clean branch to confirm 100% green starting point.
+   - **Stage 6 (QA Gate):** SDET executes full cumulative test suite and verifies 100% green pass with 0 warnings, 0 errors, and 0 skipped tests before PO review.
+
 ---
+
 
 ## 5. Scrum Team Personas & Handoff Sequence
 
