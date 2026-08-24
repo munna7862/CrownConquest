@@ -168,31 +168,34 @@ public sealed class SimulationEngine
         // 1. Process staged commands deterministically
         ProcessCommands(tick);
 
-        // 2. Update worker gathering and construction state machine
+        // 2. Update hero mana regen and ability cooldowns
+        UpdateHeroes(tick);
+
+        // 3. Update worker gathering and construction state machine
         UpdateWorkerTasks(tick);
 
-        // 3. Auto-acquire targets for idle combat units in aggro range
+        // 4. Auto-acquire targets for idle combat units in aggro range
         UpdateTargetAcquisition();
 
-        // 4. Update unit movements and navigation with boundary clamping
+        // 5. Update unit movements and navigation with boundary clamping
         UpdateMovements(tick);
 
-        // 5. Update combat engagements & cooldowns
+        // 6. Update combat engagements & cooldowns
         UpdateCombat(tick);
 
-        // 6. Update building production queues
+        // 7. Update building production queues
         UpdateProduction(tick);
 
-        // 7. Update building research queues
+        // 8. Update building research queues
         UpdateResearch(tick);
 
-        // 8. Update era advancement state machines
+        // 9. Update era advancement state machines
         UpdateEraAdvancement(tick);
 
-        // 9. Update population counts and capacities
+        // 10. Update population counts and capacities
         UpdatePopulation(tick);
 
-        // 10. Cleanup deceased entities and depleted nodes at tick boundary
+        // 11. Cleanup deceased entities and depleted nodes at tick boundary
         CleanupEntities();
     }
 
@@ -220,6 +223,30 @@ public sealed class SimulationEngine
     {
         switch (command)
         {
+            case AttachToHeroCommand attachHero:
+            {
+                ExecuteAttachToHero(attachHero, tick);
+                break;
+            }
+
+            case DetachFromHeroCommand detachHero:
+            {
+                ExecuteDetachFromHero(detachHero, tick);
+                break;
+            }
+
+            case CastHeroAbilityCommand castAbility:
+            {
+                ExecuteCastHeroAbility(castAbility, tick);
+                break;
+            }
+
+            case AllocateHeroAttributeCommand allocAttr:
+            {
+                ExecuteAllocateHeroAttribute(allocAttr, tick);
+                break;
+            }
+
             case SpawnUnitCommand spawn:
             {
                 var unitId = _state.GenerateEntityId();
@@ -694,6 +721,274 @@ public sealed class SimulationEngine
                 item.Cost));
         }
     }
+
+    private void ExecuteAttachToHero(AttachToHeroCommand attach, ulong tick)
+    {
+        if (!_state.TryGetUnit(attach.HeroId, out var heroUnit) || heroUnit == null || !heroUnit.IsAlive || heroUnit.HeroState == null || heroUnit.FactionId != attach.FactionId)
+        {
+            return;
+        }
+
+        int attachedCount = 0;
+        for (int i = 0; i < attach.UnitIds.Length; i++)
+        {
+            var unitId = attach.UnitIds[i];
+            if (unitId == attach.HeroId) continue;
+
+            if (_state.TryGetUnit(unitId, out var unit) && unit != null && unit.IsAlive && unit.FactionId == attach.FactionId)
+            {
+                if (heroUnit.HeroState.AttachUnit(unitId))
+                {
+                    attachedCount++;
+                }
+            }
+        }
+
+        _eventBus.Publish(new HeroAttachedUnitsChangedEvent(
+            tick,
+            attach.HeroId,
+            attach.FactionId,
+            heroUnit.HeroState.AttachedUnitIds.Count,
+            heroUnit.HeroState.LeadershipCapacity));
+    }
+
+    private void ExecuteDetachFromHero(DetachFromHeroCommand detach, ulong tick)
+    {
+        if (!_state.TryGetUnit(detach.HeroId, out var heroUnit) || heroUnit == null || heroUnit.HeroState == null || heroUnit.FactionId != detach.FactionId)
+        {
+            return;
+        }
+
+        for (int i = 0; i < detach.UnitIds.Length; i++)
+        {
+            heroUnit.HeroState.DetachUnit(detach.UnitIds[i]);
+        }
+
+        _eventBus.Publish(new HeroAttachedUnitsChangedEvent(
+            tick,
+            detach.HeroId,
+            detach.FactionId,
+            heroUnit.HeroState.AttachedUnitIds.Count,
+            heroUnit.HeroState.LeadershipCapacity));
+    }
+
+    private void ExecuteCastHeroAbility(CastHeroAbilityCommand cast, ulong tick)
+    {
+        if (!_state.TryGetUnit(cast.HeroId, out var heroUnit) || heroUnit == null || !heroUnit.IsAlive || heroUnit.HeroState == null || heroUnit.FactionId != cast.FactionId)
+        {
+            return;
+        }
+
+        if (!heroUnit.HeroState.TryGetAbility(cast.AbilityId, out var ability) || ability == null || !ability.IsReady)
+        {
+            return;
+        }
+
+        if (heroUnit.HeroState.CurrentMana < ability.Definition.ManaCost)
+        {
+            return;
+        }
+
+        // Range checks
+        Vector2D targetPos = cast.TargetPosition;
+        if (cast.TargetEntityId.IsValid && _state.TryGetUnit(cast.TargetEntityId, out var targetEntity) && targetEntity != null)
+        {
+            targetPos = targetEntity.Position;
+        }
+
+        if (ability.Definition.CastRange > 0f)
+        {
+            if (heroUnit.Position.DistanceTo(targetPos) > ability.Definition.CastRange + 0.5f)
+            {
+                return;
+            }
+        }
+
+        // Deduct mana & trigger cooldown
+        heroUnit.HeroState.ConsumeMana(ability.Definition.ManaCost);
+        ability.TriggerCooldown();
+
+        // Execute effect
+        switch (ability.Definition.EffectType)
+        {
+            case AbilityEffectType.Damage:
+            {
+                if (ability.Definition.TargetType == AbilityTargetType.SingleTargetEnemy)
+                {
+                    if (cast.TargetEntityId.IsValid && _state.TryGetUnit(cast.TargetEntityId, out var enemy) && enemy != null && enemy.IsAlive && enemy.FactionId != heroUnit.FactionId)
+                    {
+                        float spellDmg = CombatFormulas.CalculateHeroSpellDamage(
+                            ability.Definition.BasePower,
+                            heroUnit.HeroState.AbilityPotencyMultiplier,
+                            enemy.Armor);
+
+                        enemy.TakeCombatDamage(spellDmg, heroUnit.Id, heroUnit.FactionId, tick, _eventBus, out bool killed);
+                        if (killed)
+                        {
+                            AwardKillXpToHero(heroUnit, enemy.KillXpValue, tick);
+                        }
+                    }
+                }
+                else
+                {
+                    // PointAreaEnemy or area damage
+                    Vector2D center = ability.Definition.CastRange > 0f && targetPos != Vector2D.Zero ? targetPos : heroUnit.Position;
+                    float radius = MathF.Max(1.0f, ability.Definition.Radius);
+
+                    var activeUnits = _state.ActiveUnits;
+                    for (int i = 0; i < activeUnits.Count; i++)
+                    {
+                        var enemy = activeUnits[i];
+                        if (enemy.IsAlive && enemy.FactionId != heroUnit.FactionId)
+                        {
+                            float dist = enemy.Position.DistanceTo(center);
+                            if (dist <= radius + 0.5f)
+                            {
+                                float spellDmg = CombatFormulas.CalculateHeroSpellDamage(
+                                    ability.Definition.BasePower,
+                                    heroUnit.HeroState.AbilityPotencyMultiplier,
+                                    enemy.Armor);
+
+                                enemy.TakeCombatDamage(spellDmg, heroUnit.Id, heroUnit.FactionId, tick, _eventBus, out bool killed);
+                                if (killed)
+                                {
+                                    AwardKillXpToHero(heroUnit, enemy.KillXpValue, tick);
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+
+            case AbilityEffectType.Heal:
+            {
+                Vector2D center = ability.Definition.CastRange > 0f && targetPos != Vector2D.Zero ? targetPos : heroUnit.Position;
+                float radius = MathF.Max(1.0f, ability.Definition.Radius);
+                float healAmount = ability.Definition.BasePower * heroUnit.HeroState.AbilityPotencyMultiplier;
+
+                var activeUnits = _state.ActiveUnits;
+                for (int i = 0; i < activeUnits.Count; i++)
+                {
+                    var ally = activeUnits[i];
+                    if (ally.IsAlive && ally.FactionId == heroUnit.FactionId)
+                    {
+                        float dist = ally.Position.DistanceTo(center);
+                        if (dist <= radius + 0.5f)
+                        {
+                            ally.Heal(healAmount);
+                        }
+                    }
+                }
+                break;
+            }
+
+
+            case AbilityEffectType.Buff:
+            case AbilityEffectType.Stun:
+            {
+                break;
+            }
+        }
+
+        _eventBus.Publish(new HeroAbilityCastEvent(
+            tick,
+            heroUnit.Id,
+            heroUnit.FactionId,
+            cast.AbilityId,
+            cast.TargetEntityId,
+            targetPos,
+            ability.Definition.ManaCost));
+    }
+
+    private void ExecuteAllocateHeroAttribute(AllocateHeroAttributeCommand alloc, ulong tick)
+    {
+        if (!_state.TryGetUnit(alloc.HeroId, out var heroUnit) || heroUnit == null || heroUnit.HeroState == null || heroUnit.FactionId != alloc.FactionId)
+        {
+            return;
+        }
+
+        if (heroUnit.HeroState.AllocateAttribute(alloc.AttributeName))
+        {
+            _eventBus.Publish(new HeroAttributeAllocatedEvent(
+                tick,
+                alloc.HeroId,
+                alloc.FactionId,
+                alloc.AttributeName,
+                heroUnit.HeroState.TotalAttributes));
+        }
+    }
+
+    public void AwardKillXpToHero(UnitEntity heroUnit, int xpAmount, ulong tick)
+    {
+        if (!heroUnit.IsAlive || heroUnit.HeroState == null) return;
+
+        int oldLevel = heroUnit.Veterancy.Level;
+        heroUnit.Veterancy.AwardXp(xpAmount, tick, _eventBus, out bool leveledUp, out _);
+
+        if (leveledUp)
+        {
+            int levelsGained = heroUnit.Veterancy.Level - oldLevel;
+            float healthBonus = levelsGained * heroUnit.HealthPerLevelBonus;
+            heroUnit.ApplyLevelUpBonus(healthBonus);
+
+            _eventBus.Publish(new HeroLevelUpEvent(
+                tick,
+                heroUnit.Id,
+                heroUnit.FactionId,
+                oldLevel,
+                heroUnit.Veterancy.Level,
+                heroUnit.HeroState.TotalAttributes));
+        }
+    }
+
+    public void GetUnitAuraModifiers(UnitEntity unit, out float damageBonus, out float armorBonus, out float speedBonus)
+    {
+        damageBonus = 0f;
+        armorBonus = 0f;
+        speedBonus = 0f;
+
+        if (!unit.IsAlive) return;
+
+        var units = _state.ActiveUnits;
+        for (int i = 0; i < units.Count; i++)
+        {
+            var heroUnit = units[i];
+            if (heroUnit.FactionId == unit.FactionId && heroUnit.IsAlive && heroUnit.HeroState?.ActiveAura != null)
+            {
+                var aura = heroUnit.HeroState.ActiveAura;
+                bool isAttached = heroUnit.HeroState.AttachedUnitIds.Contains(unit.Id);
+                bool isSelf = heroUnit.Id == unit.Id;
+
+                if (isAttached || isSelf)
+                {
+                    float distSq = unit.Position.DistanceSquaredTo(heroUnit.Position);
+                    if (distSq <= aura.Radius * aura.Radius)
+                    {
+                        damageBonus = MathF.Max(damageBonus, aura.DamageMultiplierBonus);
+                        armorBonus = MathF.Max(armorBonus, aura.ArmorBonus);
+                        speedBonus = MathF.Max(speedBonus, aura.MovementSpeedMultiplierBonus);
+                    }
+                }
+            }
+        }
+    }
+
+    private void UpdateHeroes(ulong tick)
+    {
+        var units = _state.ActiveUnits;
+        int count = units.Count;
+        for (int i = 0; i < count; i++)
+        {
+            var unit = units[i];
+            if (unit.IsAlive && unit.HeroState != null)
+            {
+                unit.HeroState.RegenerateMana();
+                unit.HeroState.TickCooldowns();
+            }
+        }
+    }
+
 
     private void UpdateWorkerTasks(ulong tick)
     {
@@ -1512,13 +1807,18 @@ public sealed class SimulationEngine
                 {
                     unit.ResetCooldown();
 
-                    float calculatedDamage = CombatFormulas.CalculateCombatDamage(
+                    GetUnitAuraModifiers(unit, out float attackerAuraDmg, out _, out _);
+                    GetUnitAuraModifiers(target, out _, out float targetAuraArmor, out _);
+
+                    float calculatedDamage = CombatFormulas.CalculateCombatDamageWithAura(
                         unit.Archetype,
                         unit.AttackDamage,
                         attackerTech,
+                        attackerAuraDmg,
                         target.Archetype,
                         target.Armor,
-                        targetTech);
+                        targetTech,
+                        targetAuraArmor);
 
                     target.TakeCombatDamage(calculatedDamage, unit.Id, unit.FactionId, tick, _eventBus, out bool killed);
 
@@ -1540,6 +1840,33 @@ public sealed class SimulationEngine
                                 int levelsGained = unit.Veterancy.Level - oldLevel;
                                 float healthBonus = levelsGained * unit.HealthPerLevelBonus;
                                 unit.ApplyLevelUpBonus(healthBonus);
+
+                                if (unit.IsHero && unit.HeroState != null)
+                                {
+                                    _eventBus.Publish(new HeroLevelUpEvent(
+                                        tick,
+                                        unit.Id,
+                                        unit.FactionId,
+                                        oldLevel,
+                                        unit.Veterancy.Level,
+                                        unit.HeroState.TotalAttributes));
+                                }
+                            }
+
+                            // Shared squad XP to attached hero
+                            if (!unit.IsHero)
+                            {
+                                var unitsList = _state.ActiveUnits;
+                                for (int h = 0; h < unitsList.Count; h++)
+                                {
+                                    var potentialHero = unitsList[h];
+                                    if (potentialHero.FactionId == unit.FactionId && potentialHero.IsHero && potentialHero.HeroState != null && potentialHero.HeroState.AttachedUnitIds.Contains(unit.Id))
+                                    {
+                                        int sharedXp = Math.Max(10, target.KillXpValue / 2);
+                                        AwardKillXpToHero(potentialHero, sharedXp, tick);
+                                        break;
+                                    }
+                                }
                             }
 
                             SimLogger.LogInfo("Combat", $"Unit {unit.Id} killed {target.Id}. Awarded {target.KillXpValue} XP. Level={unit.Veterancy.Level} ({unit.Veterancy.Rank.GetDisplayName()})");
@@ -1555,6 +1882,7 @@ public sealed class SimulationEngine
 
     private void CleanupEntities()
     {
+        ulong tick = _state.CurrentTick;
         // 1. Dead units
         var units = _state.ActiveUnits;
         for (int i = 0; i < units.Count; i++)
@@ -1562,7 +1890,14 @@ public sealed class SimulationEngine
             var unit = units[i];
             if (!unit.IsAlive)
             {
+                if (unit.IsHero && unit.HeroState != null)
+                {
+                    _eventBus.Publish(new HeroFallenEvent(tick, unit.Id, unit.FactionId, unit.Position));
+                    unit.HeroState.ClearAttachedUnits();
+                }
+
                 _spatialGrid.Remove(unit.Id);
+
 
                 for (int j = 0; j < units.Count; j++)
                 {

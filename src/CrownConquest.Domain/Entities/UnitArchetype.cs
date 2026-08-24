@@ -9,7 +9,8 @@ public enum UnitArchetype
     Spearman,
     Archer,
     Cavalry,
-    Siege
+    Siege,
+    Hero
 }
 
 public static class UnitArchetypeExtensions
@@ -17,6 +18,10 @@ public static class UnitArchetypeExtensions
     public static UnitArchetype FromUnitType(string unitType)
     {
         var lower = unitType.ToLowerInvariant();
+        if (lower.Contains("warlord") || lower.Contains("druid") || lower.Contains("centurion") || lower.Contains("hero"))
+        {
+            return UnitArchetype.Hero;
+        }
         if (lower.Contains("villager") || lower.Contains("worker") || lower.Contains("plebeian"))
         {
             return UnitArchetype.Worker;
@@ -41,3 +46,4 @@ public static class UnitArchetypeExtensions
         return UnitArchetype.Infantry;
     }
 }
+

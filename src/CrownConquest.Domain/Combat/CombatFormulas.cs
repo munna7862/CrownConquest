@@ -103,4 +103,54 @@ public static class CombatFormulas
     {
         return a.DistanceTo(b);
     }
+
+    /// <summary>
+    /// Calculates effective spell/ability damage factoring in hero ability potency and target armor/resistance.
+    /// </summary>
+    public static float CalculateHeroSpellDamage(float baseAbilityPower, float abilityPotencyMultiplier, float targetArmor, float armorPenetration = 0.5f)
+    {
+        float rawSpellPower = baseAbilityPower * abilityPotencyMultiplier;
+        float effectiveArmor = MathF.Max(0f, targetArmor * (1.0f - armorPenetration));
+        float finalDamage = rawSpellPower - effectiveArmor;
+        return MathF.Max(MinimumDamageFloor, finalDamage);
+    }
+
+    /// <summary>
+    /// Calculates full combat damage including technology bonuses and hero leadership aura bonuses.
+    /// </summary>
+    public static float CalculateCombatDamageWithAura(
+        UnitArchetype attackerArchetype,
+        float attackerRawAttack,
+        TechModifiers attackerTech,
+        float attackerAuraDamageBonus,
+        UnitArchetype targetArchetype,
+        float targetRawArmor,
+        TechModifiers targetTech,
+        float targetAuraArmorBonus,
+        float customModifier = 1.0f)
+    {
+        float techAttackBonus = attackerArchetype switch
+        {
+            UnitArchetype.Infantry or UnitArchetype.Spearman or UnitArchetype.Hero => attackerTech.MeleeAttackBonus,
+            UnitArchetype.Archer => attackerTech.RangedAttackBonus,
+            UnitArchetype.Cavalry => attackerTech.CavalryAttackBonus,
+            _ => 0f
+        };
+
+        float techArmorBonus = targetArchetype switch
+        {
+            UnitArchetype.Infantry or UnitArchetype.Spearman or UnitArchetype.Hero => targetTech.MeleeArmorBonus,
+            UnitArchetype.Archer => targetTech.RangedArmorBonus,
+            UnitArchetype.Cavalry => targetTech.CavalryArmorBonus,
+            _ => 0f
+        };
+
+        float totalAttack = attackerRawAttack + techAttackBonus;
+        float totalArmor = targetRawArmor + techArmorBonus + targetAuraArmorBonus;
+        float archetypeMultiplier = GetArchetypeMultiplier(attackerArchetype, targetArchetype);
+        float combinedModifier = customModifier * archetypeMultiplier * (1.0f + attackerAuraDamageBonus);
+
+        return CalculateEffectiveDamage(totalAttack, totalArmor, combinedModifier);
+    }
 }
+

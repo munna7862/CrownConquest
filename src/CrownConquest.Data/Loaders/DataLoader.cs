@@ -260,4 +260,85 @@ public static class DataLoader
         string json = File.ReadAllText(filePath);
         return LoadTechnologiesFromJson(json);
     }
+
+    public static Result<List<AbilityDefinitionModel>> LoadAbilitiesFromJson(string json)
+    {
+        try
+        {
+            var abilities = JsonSerializer.Deserialize<List<AbilityDefinitionModel>>(json, JsonOptions);
+            if (abilities == null || abilities.Count == 0)
+            {
+                return Result<List<AbilityDefinitionModel>>.Failure(new GameError("EMPTY_DATA", "Abilities definition is empty."));
+            }
+
+            foreach (var a in abilities)
+            {
+                if (string.IsNullOrWhiteSpace(a.Id))
+                {
+                    return Result<List<AbilityDefinitionModel>>.Failure(new GameError("INVALID_ABILITY_ID", "Ability ID cannot be empty."));
+                }
+                if (a.CooldownTicks < 0 || a.ManaCost < 0)
+                {
+                    return Result<List<AbilityDefinitionModel>>.Failure(new GameError("INVALID_ABILITY_STATS", $"Invalid stats for ability {a.Id}."));
+                }
+            }
+
+            return Result<List<AbilityDefinitionModel>>.Success(abilities);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<AbilityDefinitionModel>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<HeroDefinition>> LoadHeroesFromJson(string json)
+    {
+        try
+        {
+            var heroes = JsonSerializer.Deserialize<List<HeroDefinition>>(json, JsonOptions);
+            if (heroes == null || heroes.Count == 0)
+            {
+                return Result<List<HeroDefinition>>.Failure(new GameError("EMPTY_DATA", "Heroes definition is empty."));
+            }
+
+            foreach (var h in heroes)
+            {
+                if (string.IsNullOrWhiteSpace(h.Id))
+                {
+                    return Result<List<HeroDefinition>>.Failure(new GameError("INVALID_HERO_ID", "Hero ID cannot be empty."));
+                }
+                if (h.BaseStrength <= 0 || h.BaseLeadershipCapacity <= 0)
+                {
+                    return Result<List<HeroDefinition>>.Failure(new GameError("INVALID_HERO_STATS", $"Invalid stats for hero {h.Id}."));
+                }
+            }
+
+            return Result<List<HeroDefinition>>.Success(heroes);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<HeroDefinition>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<AbilityDefinitionModel>> LoadAbilitiesFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<AbilityDefinitionModel>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadAbilitiesFromJson(json);
+    }
+
+    public static Result<List<HeroDefinition>> LoadHeroesFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<HeroDefinition>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadHeroesFromJson(json);
+    }
 }
+

@@ -181,7 +181,20 @@ public sealed class SimulationState
                 hash = (hash ^ (ulong)unit.WorkerState.CarriedAmount) * 1099511628211UL;
                 hash = (hash ^ (ulong)(unit.WorkerState.CarriedResourceType.HasValue ? (int)unit.WorkerState.CarriedResourceType.Value + 1 : 0)) * 1099511628211UL;
             }
+            if (unit.HeroState != null)
+            {
+                hash = (hash ^ (ulong)unit.HeroState.TotalAttributes.Strength) * 1099511628211UL;
+                hash = (hash ^ (ulong)unit.HeroState.TotalAttributes.Agility) * 1099511628211UL;
+                hash = (hash ^ (ulong)unit.HeroState.TotalAttributes.Willpower) * 1099511628211UL;
+                hash = (hash ^ (ulong)BitConverter.SingleToInt32Bits(unit.HeroState.CurrentMana)) * 1099511628211UL;
+                hash = (hash ^ (ulong)unit.HeroState.AttachedUnitIds.Count) * 1099511628211UL;
+                for (int a = 0; a < unit.HeroState.Abilities.Count; a++)
+                {
+                    hash = (hash ^ (ulong)unit.HeroState.Abilities[a].CooldownRemainingTicks) * 1099511628211UL;
+                }
+            }
         }
+
 
         // Buildings checksum
         for (int i = 0; i < _activeBuildingList.Count; i++)

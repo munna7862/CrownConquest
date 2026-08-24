@@ -35,6 +35,23 @@ public sealed class VeterancyState
         ? _xpThresholds[Level] - CurrentXp
         : 0;
 
+    public int NextLevelThreshold => Level < _xpThresholds.Length
+        ? _xpThresholds[Level]
+        : _xpThresholds[^1];
+
+    public float ProgressNormalized
+    {
+        get
+        {
+            if (Level >= _xpThresholds.Length) return 1.0f;
+            int currentFloor = _xpThresholds[Level - 1];
+            int nextFloor = _xpThresholds[Level];
+            int range = nextFloor - currentFloor;
+            return range > 0 ? Math.Clamp((float)(CurrentXp - currentFloor) / range, 0f, 1f) : 1.0f;
+        }
+    }
+
+
     public VeterancyState(EntityId entityId, int initialLevel = 1, int initialXp = 0, int[]? customThresholds = null)
     {
         EntityId = entityId;
