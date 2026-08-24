@@ -420,5 +420,46 @@ public static class DataLoader
         string json = File.ReadAllText(filePath);
         return LoadFormationsFromJson(json);
     }
+
+    public static Result<List<AiPersonalityDefinitionModel>> LoadAiPersonalitiesFromJson(string json)
+    {
+        try
+        {
+            var personalities = JsonSerializer.Deserialize<List<AiPersonalityDefinitionModel>>(json, JsonOptions);
+            if (personalities == null || personalities.Count == 0)
+            {
+                return Result<List<AiPersonalityDefinitionModel>>.Failure(new GameError("EMPTY_DATA", "AI personalities definition is empty."));
+            }
+
+            foreach (var p in personalities)
+            {
+                if (string.IsNullOrWhiteSpace(p.Id))
+                {
+                    return Result<List<AiPersonalityDefinitionModel>>.Failure(new GameError("INVALID_PERSONALITY_ID", "Personality ID cannot be empty."));
+                }
+                if (p.RetreatOddsThreshold < 0f || p.RetreatOddsThreshold > 1.0f)
+                {
+                    return Result<List<AiPersonalityDefinitionModel>>.Failure(new GameError("INVALID_PERSONALITY_STATS", $"Invalid retreat odds threshold for personality {p.Id}."));
+                }
+            }
+
+            return Result<List<AiPersonalityDefinitionModel>>.Success(personalities);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<AiPersonalityDefinitionModel>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<AiPersonalityDefinitionModel>> LoadAiPersonalitiesFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<AiPersonalityDefinitionModel>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadAiPersonalitiesFromJson(json);
+    }
 }
+
 
