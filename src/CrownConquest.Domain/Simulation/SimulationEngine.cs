@@ -183,6 +183,9 @@ public sealed class SimulationEngine
         // 6. Update combat engagements & cooldowns
         UpdateCombat(tick);
 
+        // 6.5. Update defensive towers autonomous defense
+        UpdateTowers(tick);
+
         // 7. Update unit morale, hero auras, and routing state machines
         UpdateMorale(tick);
 
@@ -501,6 +504,77 @@ public sealed class SimulationEngine
             case CancelResearchCommand cancelResearch:
             {
                 ExecuteCancelResearch(cancelResearch, tick);
+                break;
+            }
+
+            case AttackBuildingCommand attackBld:
+            {
+                for (int i = 0; i < attackBld.UnitIds.Length; i++)
+                {
+                    if (_state.TryGetUnit(attackBld.UnitIds[i], out var unit) && unit != null && unit.FactionId == attackBld.FactionId && unit.IsAlive)
+                    {
+                        unit.Attack(attackBld.TargetBuildingId);
+                    }
+                }
+                break;
+            }
+
+            case ToggleGateCommand toggleGate:
+            {
+                if (_state.TryGetBuilding(toggleGate.GateId, out var gate) && gate != null && gate.FactionId == toggleGate.FactionId && gate.IsGate && gate.GateDefense != null)
+                {
+                    var oldState = gate.GateDefense.State;
+                    if (toggleGate.TargetState.HasValue)
+                    {
+                        gate.GateDefense.TrySetState(toggleGate.TargetState.Value);
+                    }
+                    else
+                    {
+                        gate.GateDefense.Toggle();
+                    }
+                    _eventBus.Publish(new GateStateChangedEvent(tick, gate.Id, gate.FactionId, oldState, gate.GateDefense.State));
+                }
+                break;
+            }
+
+            case GarrisonTowerCommand garrison:
+            {
+                if (_state.TryGetBuilding(garrison.TowerId, out var tower) && tower != null && tower.FactionId == garrison.FactionId && tower.IsTower && tower.TowerDefense != null && tower.IsConstructed && tower.IsAlive)
+                {
+                    for (int i = 0; i < garrison.UnitIds.Length; i++)
+                    {
+                        var unitId = garrison.UnitIds[i];
+                        if (_state.TryGetUnit(unitId, out var unit) && unit != null && unit.FactionId == garrison.FactionId && unit.IsAlive && !unit.IsHero && unit.Archetype != UnitArchetype.Siege)
+                        {
+                            if (tower.TowerDefense.TryGarrison(unitId))
+                            {
+                                unit.Stop();
+                                unit.Position = tower.Position;
+                                _eventBus.Publish(new UnitGarrisonedEvent(tick, tower.Id, unit.Id, tower.FactionId, tower.TowerDefense.GarrisonCount));
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+
+            case UngarrisonTowerCommand ungarrison:
+            {
+                if (_state.TryGetBuilding(ungarrison.TowerId, out var tower) && tower != null && tower.FactionId == ungarrison.FactionId && tower.IsTower && tower.TowerDefense != null)
+                {
+                    var egressUnits = tower.TowerDefense.UngarrisonAll();
+                    for (int i = 0; i < egressUnits.Count; i++)
+                    {
+                        var uId = egressUnits[i];
+                        if (_state.TryGetUnit(uId, out var u) && u != null && u.IsAlive)
+                        {
+                            var egressPos = new Vector2D(tower.Position.X + 1.5f + (i * 0.5f), tower.Position.Y + 1.5f);
+                            egressPos = _bounds.Clamp(egressPos);
+                            u.Position = egressPos;
+                            _eventBus.Publish(new UnitUngarrisonedEvent(tick, tower.Id, u.Id, tower.FactionId, egressPos));
+                        }
+                    }
+                }
                 break;
             }
         }
@@ -1636,6 +1710,60 @@ public sealed class SimulationEngine
                         baseArmor: 5.0f,
                         archetype: UnitArchetype.Infantry);
                 }
+                else if (lower.Contains("ram"))
+                {
+                    producedUnit = new UnitEntity(
+                        unitId,
+                        building.FactionId,
+                        item.UnitType,
+                        spawnPos,
+                        maxHealth: 250f,
+                        attackDamage: 40f,
+                        attackRange: 1.8f,
+                        movementSpeed: 1.8f,
+                        attackCooldownTicks: 30,
+                        killXpValue: 80,
+                        baseArmor: 8.0f,
+                        attackType: "melee",
+                        aggroRange: 8.0f,
+                        archetype: UnitArchetype.Siege);
+                }
+                else if (lower.Contains("catapult") || lower.Contains("onager"))
+                {
+                    producedUnit = new UnitEntity(
+                        unitId,
+                        building.FactionId,
+                        item.UnitType,
+                        spawnPos,
+                        maxHealth: 150f,
+                        attackDamage: 35f,
+                        attackRange: 12.0f,
+                        movementSpeed: 2.2f,
+                        attackCooldownTicks: 40,
+                        killXpValue: 100,
+                        baseArmor: 2.0f,
+                        attackType: "ranged",
+                        aggroRange: 14.0f,
+                        archetype: UnitArchetype.Siege);
+                }
+                else if (lower.Contains("ballista") || lower.Contains("scorpion"))
+                {
+                    producedUnit = new UnitEntity(
+                        unitId,
+                        building.FactionId,
+                        item.UnitType,
+                        spawnPos,
+                        maxHealth: 140f,
+                        attackDamage: 45f,
+                        attackRange: 10.0f,
+                        movementSpeed: 2.6f,
+                        attackCooldownTicks: 25,
+                        killXpValue: 85,
+                        baseArmor: 2.0f,
+                        attackType: "ranged",
+                        aggroRange: 12.0f,
+                        archetype: UnitArchetype.Siege);
+                }
                 else
                 {
                     // Default Swordsman
@@ -1853,157 +1981,348 @@ public sealed class SimulationEngine
 
             if (unit.State == UnitState.Attacking && unit.AttackTargetId.IsValid)
             {
-                if (!_state.TryGetUnit(unit.AttackTargetId, out var target) || target == null || !target.IsAlive)
+                if (_state.TryGetUnit(unit.AttackTargetId, out var target) && target != null && target.IsAlive)
                 {
-                    unit.AttackTargetId = EntityId.None;
-                    unit.State = UnitState.Idle;
-                    unit.Charge.Reset();
-                    continue;
-                }
+                    var attackerTech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
+                    var targetTech = _state.GetOrCreateTechManager(target.FactionId).Modifiers;
 
-                var attackerTech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
-                var targetTech = _state.GetOrCreateTechManager(target.FactionId).Modifiers;
+                    float rangeBonus = unit.Archetype == UnitArchetype.Archer ? attackerTech.RangedRangeBonus : 0f;
+                    int attackerElevation = unit.TerrainModifiers.ElevationLevel;
+                    int targetElevation = target.TerrainModifiers.ElevationLevel;
 
-                float rangeBonus = unit.Archetype == UnitArchetype.Archer ? attackerTech.RangedRangeBonus : 0f;
-                int attackerElevation = unit.TerrainModifiers.ElevationLevel;
-                int targetElevation = target.TerrainModifiers.ElevationLevel;
+                    bool isCatapult = unit.UnitType.Contains("catapult", StringComparison.OrdinalIgnoreCase) || unit.UnitType.Contains("onager", StringComparison.OrdinalIgnoreCase);
+                    float minRange = isCatapult ? CombatFormulas.CatapultMinRange : 0f;
+                    float maxRange = unit.AttackRange;
 
-                if (!CombatFormulas.IsInRange(unit.Position, target.Position, unit.AttackRange, rangeBonus, attackerElevation, targetElevation))
-                {
-                    var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
-                    float effectiveSpeed = unit.MovementSpeed + (unit.Archetype == UnitArchetype.Cavalry ? tech.CavalrySpeedBonus : 0f);
-                    float maxDistance = effectiveSpeed * dt;
-                    var prevPos = unit.Position;
-                    var dir = target.Position - unit.Position;
-                    if (dir.LengthSquared > 0.01f)
+                    bool inRange = isCatapult
+                        ? CombatFormulas.IsSiegeInRange(unit.Position, target.Position, minRange, maxRange, rangeBonus, attackerElevation, targetElevation)
+                        : CombatFormulas.IsInRange(unit.Position, target.Position, unit.AttackRange, rangeBonus, attackerElevation, targetElevation);
+
+                    if (!inRange)
                     {
-                        unit.HeadingDirection = dir.Normalized();
-                    }
-
-                    if (unit.Archetype == UnitArchetype.Cavalry)
-                    {
-                        unit.Charge.IncrementMomentum();
-                    }
-
-                    var nextPos = unit.Position.MoveTowards(target.Position, maxDistance);
-                    nextPos = _bounds.Clamp(nextPos);
-
-                    unit.Position = nextPos;
-                    _spatialGrid.UpdatePosition(unit.Id, prevPos, unit.Position);
-                    _eventBus.Publish(new UnitMovedEvent(tick, unit.Id, prevPos, unit.Position));
-                }
-                else if (unit.CooldownRemaining <= 0)
-                {
-                    unit.ResetCooldown();
-
-                    GetUnitAuraModifiers(unit, out float attackerAuraDmg, out _, out _);
-                    GetUnitAuraModifiers(target, out _, out float targetAuraArmor, out _);
-
-                    bool isCharging = unit.Archetype == UnitArchetype.Cavalry && unit.Charge.IsCharging;
-                    bool isRanged = unit.AttackType.Equals("ranged", StringComparison.OrdinalIgnoreCase) || unit.Archetype == UnitArchetype.Archer;
-
-                    bool isFlanking = CombatFormulas.IsFlankingAttack(unit.Position, target.Position, target.HeadingDirection);
-                    if (isFlanking && target.Formation != FormationType.Square)
-                    {
-                        target.Morale.ApplyShock(15.0f);
-                    }
-
-                    var (calculatedDamage, chargeBlocked, recoilDamage) = CombatFormulas.CalculateTacticalCombatDamage(
-                        unit.Archetype,
-                        unit.AttackDamage,
-                        attackerTech,
-                        attackerAuraDmg,
-                        unit.FormationModifiers,
-                        unit.Morale.Level,
-                        unit.TerrainModifiers,
-                        isCharging,
-                        isRanged,
-                        target.Archetype,
-                        target.Armor,
-                        targetTech,
-                        targetAuraArmor,
-                        target.FormationModifiers,
-                        target.Morale.Level,
-                        target.TerrainModifiers);
-
-                    if (isCharging)
-                    {
-                        unit.Charge.Discharge();
-                        _eventBus.Publish(new CavalryChargeImpactEvent(
-                            tick,
-                            unit.Id,
-                            target.Id,
-                            calculatedDamage,
-                            chargeBlocked,
-                            recoilDamage));
-
-                        if (!chargeBlocked)
+                        var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
+                        float effectiveSpeed = unit.MovementSpeed + (unit.Archetype == UnitArchetype.Cavalry ? tech.CavalrySpeedBonus : 0f);
+                        float maxDistance = effectiveSpeed * dt;
+                        var prevPos = unit.Position;
+                        var dir = target.Position - unit.Position;
+                        if (dir.LengthSquared > 0.01f)
                         {
-                            target.Morale.ApplyShock(ChargeState.ChargeMoraleShock);
+                            unit.HeadingDirection = dir.Normalized();
                         }
 
-                        if (chargeBlocked && recoilDamage > 0f)
+                        if (unit.Archetype == UnitArchetype.Cavalry)
                         {
-                            unit.TakeRecoilDamage(recoilDamage, target.Id, tick, _eventBus, out _);
+                            unit.Charge.IncrementMomentum();
                         }
+
+                        var nextPos = unit.Position.MoveTowards(target.Position, maxDistance);
+                        nextPos = _bounds.Clamp(nextPos);
+
+                        unit.Position = nextPos;
+                        _spatialGrid.UpdatePosition(unit.Id, prevPos, unit.Position);
+                        _eventBus.Publish(new UnitMovedEvent(tick, unit.Id, prevPos, unit.Position));
                     }
-
-                    target.TakeCombatDamage(calculatedDamage, unit.Id, unit.FactionId, tick, _eventBus, out bool killed);
-
-                    if (killed)
+                    else if (unit.CooldownRemaining <= 0)
                     {
-                        ApplyNearbyCasualtyMoraleShock(target, tick);
+                        unit.ResetCooldown();
 
-                        if (unit.IsAlive && unit.FactionId != target.FactionId)
+                        GetUnitAuraModifiers(unit, out float attackerAuraDmg, out _, out _);
+                        GetUnitAuraModifiers(target, out _, out float targetAuraArmor, out _);
+
+                        bool isCharging = unit.Archetype == UnitArchetype.Cavalry && unit.Charge.IsCharging;
+                        bool isRanged = unit.AttackType.Equals("ranged", StringComparison.OrdinalIgnoreCase) || unit.Archetype == UnitArchetype.Archer || unit.Archetype == UnitArchetype.Siege;
+
+                        bool isFlanking = CombatFormulas.IsFlankingAttack(unit.Position, target.Position, target.HeadingDirection);
+                        if (isFlanking && target.Formation != FormationType.Square)
                         {
-                            unit.Veterancy.RecordKill();
-                            int oldLevel = unit.Veterancy.Level;
-                            unit.Veterancy.AwardXp(
-                                target.KillXpValue,
+                            target.Morale.ApplyShock(15.0f);
+                        }
+
+                        var (calculatedDamage, chargeBlocked, recoilDamage) = CombatFormulas.CalculateTacticalCombatDamage(
+                            unit.Archetype,
+                            unit.AttackDamage,
+                            attackerTech,
+                            attackerAuraDmg,
+                            unit.FormationModifiers,
+                            unit.Morale.Level,
+                            unit.TerrainModifiers,
+                            isCharging,
+                            isRanged,
+                            target.Archetype,
+                            target.Armor,
+                            targetTech,
+                            targetAuraArmor,
+                            target.FormationModifiers,
+                            target.Morale.Level,
+                            target.TerrainModifiers);
+
+                        bool isBallista = unit.UnitType.Contains("ballista", StringComparison.OrdinalIgnoreCase) || unit.UnitType.Contains("scorpion", StringComparison.OrdinalIgnoreCase);
+                        if (isBallista)
+                        {
+                            calculatedDamage = CombatFormulas.CalculateArmorPiercingDamage(unit.AttackDamage, target.Armor, CombatFormulas.BallistaArmorPenetration);
+                        }
+
+                        if (isCharging)
+                        {
+                            unit.Charge.Discharge();
+                            _eventBus.Publish(new CavalryChargeImpactEvent(
                                 tick,
-                                _eventBus,
-                                out bool leveledUp,
-                                out bool rankChanged);
+                                unit.Id,
+                                target.Id,
+                                calculatedDamage,
+                                chargeBlocked,
+                                recoilDamage));
 
-                            if (leveledUp)
+                            if (!chargeBlocked)
                             {
-                                int levelsGained = unit.Veterancy.Level - oldLevel;
-                                float healthBonus = levelsGained * unit.HealthPerLevelBonus;
-                                unit.ApplyLevelUpBonus(healthBonus);
-
-                                if (unit.IsHero && unit.HeroState != null)
-                                {
-                                    _eventBus.Publish(new HeroLevelUpEvent(
-                                        tick,
-                                        unit.Id,
-                                        unit.FactionId,
-                                        oldLevel,
-                                        unit.Veterancy.Level,
-                                        unit.HeroState.TotalAttributes));
-                                }
+                                target.Morale.ApplyShock(ChargeState.ChargeMoraleShock);
                             }
 
-                            // Shared squad XP to attached hero
-                            if (!unit.IsHero)
+                            if (chargeBlocked && recoilDamage > 0f)
                             {
-                                var unitsList = _state.ActiveUnits;
-                                for (int h = 0; h < unitsList.Count; h++)
+                                unit.TakeRecoilDamage(recoilDamage, target.Id, tick, _eventBus, out _);
+                            }
+                        }
+
+                        target.TakeCombatDamage(calculatedDamage, unit.Id, unit.FactionId, tick, _eventBus, out bool killed);
+
+                        if (isCatapult)
+                        {
+                            float splashRadius = CombatFormulas.CatapultSplashRadius;
+                            float splashRadiusSq = splashRadius * splashRadius;
+                            int targetsHit = 1;
+                            float totalSplashDmg = calculatedDamage;
+
+                            var unitsList = _state.ActiveUnits;
+                            for (int u = 0; u < unitsList.Count; u++)
+                            {
+                                var splashUnit = unitsList[u];
+                                if (splashUnit.FactionId != unit.FactionId && splashUnit.IsAlive && splashUnit.Id != target.Id)
                                 {
-                                    var potentialHero = unitsList[h];
-                                    if (potentialHero.FactionId == unit.FactionId && potentialHero.IsHero && potentialHero.HeroState != null && potentialHero.HeroState.AttachedUnitIds.Contains(unit.Id))
+                                    float distSq = target.Position.DistanceSquaredTo(splashUnit.Position);
+                                    if (distSq <= splashRadiusSq)
                                     {
-                                        int sharedXp = Math.Max(10, target.KillXpValue / 2);
-                                        AwardKillXpToHero(potentialHero, sharedXp, tick);
-                                        break;
+                                        float dist = MathF.Sqrt(distSq);
+                                        float splashUnitDmg = CombatFormulas.CalculateAreaOfEffectDamage(unit.AttackDamage, dist, splashRadius);
+                                        splashUnit.TakeCombatDamage(splashUnitDmg, unit.Id, unit.FactionId, tick, _eventBus, out bool killedSplash);
+                                        targetsHit++;
+                                        totalSplashDmg += splashUnitDmg;
+                                        if (killedSplash)
+                                        {
+                                            ApplyNearbyCasualtyMoraleShock(splashUnit, tick);
+                                        }
                                     }
                                 }
                             }
 
-                            SimLogger.LogInfo("Combat", $"Unit {unit.Id} killed {target.Id}. Awarded {target.KillXpValue} XP. Level={unit.Veterancy.Level} ({unit.Veterancy.Rank.GetDisplayName()})");
+                            _eventBus.Publish(new SiegeAreaOfEffectImpactEvent(tick, unit.Id, unit.FactionId, target.Position, splashRadius, targetsHit, totalSplashDmg));
                         }
 
-                        unit.AttackTargetId = EntityId.None;
-                        unit.State = UnitState.Idle;
+                        if (killed)
+                        {
+                            ApplyNearbyCasualtyMoraleShock(target, tick);
+
+                            if (unit.IsAlive && unit.FactionId != target.FactionId)
+                            {
+                                unit.Veterancy.RecordKill();
+                                int oldLevel = unit.Veterancy.Level;
+                                unit.Veterancy.AwardXp(
+                                    target.KillXpValue,
+                                    tick,
+                                    _eventBus,
+                                    out bool leveledUp,
+                                    out bool rankChanged);
+
+                                if (leveledUp)
+                                {
+                                    int levelsGained = unit.Veterancy.Level - oldLevel;
+                                    float healthBonus = levelsGained * unit.HealthPerLevelBonus;
+                                    unit.ApplyLevelUpBonus(healthBonus);
+
+                                    if (unit.IsHero && unit.HeroState != null)
+                                    {
+                                        _eventBus.Publish(new HeroLevelUpEvent(
+                                            tick,
+                                            unit.Id,
+                                            unit.FactionId,
+                                            oldLevel,
+                                            unit.Veterancy.Level,
+                                            unit.HeroState.TotalAttributes));
+                                    }
+                                }
+
+                                // Shared squad XP to attached hero
+                                if (!unit.IsHero)
+                                {
+                                    var unitsList = _state.ActiveUnits;
+                                    for (int h = 0; h < unitsList.Count; h++)
+                                    {
+                                        var potentialHero = unitsList[h];
+                                        if (potentialHero.FactionId == unit.FactionId && potentialHero.IsHero && potentialHero.HeroState != null && potentialHero.HeroState.AttachedUnitIds.Contains(unit.Id))
+                                        {
+                                            int sharedXp = Math.Max(10, target.KillXpValue / 2);
+                                            AwardKillXpToHero(potentialHero, sharedXp, tick);
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                SimLogger.LogInfo("Combat", $"Unit {unit.Id} killed {target.Id}. Awarded {target.KillXpValue} XP. Level={unit.Veterancy.Level} ({unit.Veterancy.Rank.GetDisplayName()})");
+                            }
+
+                            unit.AttackTargetId = EntityId.None;
+                            unit.State = UnitState.Idle;
+                        }
+                    }
+                }
+                else if (_state.TryGetBuilding(unit.AttackTargetId, out var targetBuilding) && targetBuilding != null && targetBuilding.IsAlive)
+                {
+                    var attackerTech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
+                    bool isCatapult = unit.UnitType.Contains("catapult", StringComparison.OrdinalIgnoreCase) || unit.UnitType.Contains("onager", StringComparison.OrdinalIgnoreCase);
+
+                    float minRange = isCatapult ? CombatFormulas.CatapultMinRange : 0f;
+                    float maxRange = unit.AttackRange;
+
+                    bool inRange = isCatapult
+                        ? CombatFormulas.IsSiegeInRange(unit.Position, targetBuilding.Position, minRange, maxRange)
+                        : CombatFormulas.IsInRange(unit.Position, targetBuilding.Position, maxRange);
+
+                    if (!inRange)
+                    {
+                        var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
+                        float effectiveSpeed = unit.MovementSpeed + (unit.Archetype == UnitArchetype.Cavalry ? tech.CavalrySpeedBonus : 0f);
+                        float maxDistance = effectiveSpeed * dt;
+                        var prevPos = unit.Position;
+                        var dir = targetBuilding.Position - unit.Position;
+                        if (dir.LengthSquared > 0.01f)
+                        {
+                            unit.HeadingDirection = dir.Normalized();
+                        }
+
+                        var nextPos = unit.Position.MoveTowards(targetBuilding.Position, maxDistance);
+                        nextPos = _bounds.Clamp(nextPos);
+
+                        unit.Position = nextPos;
+                        _spatialGrid.UpdatePosition(unit.Id, prevPos, unit.Position);
+                        _eventBus.Publish(new UnitMovedEvent(tick, unit.Id, prevPos, unit.Position));
+                    }
+                    else if (unit.CooldownRemaining <= 0)
+                    {
+                        unit.ResetCooldown();
+
+                        float structuralDmg = CombatFormulas.CalculateStructuralCombatDamage(
+                            unit.Archetype,
+                            unit.UnitType,
+                            unit.AttackDamage,
+                            attackerTech);
+
+                        targetBuilding.TakeDamage(structuralDmg, unit.Id, unit.FactionId, tick, _eventBus, out bool destroyed);
+                        _eventBus.Publish(new BuildingAttackedEvent(tick, unit.Id, unit.FactionId, targetBuilding.Id, targetBuilding.FactionId, structuralDmg, targetBuilding.CurrentHealth));
+
+                        if (isCatapult)
+                        {
+                            float splashRadius = CombatFormulas.CatapultSplashRadius;
+                            float splashRadiusSq = splashRadius * splashRadius;
+                            int targetsHit = 1;
+                            float totalSplashDmg = structuralDmg;
+
+                            var unitsList = _state.ActiveUnits;
+                            for (int u = 0; u < unitsList.Count; u++)
+                            {
+                                var splashUnit = unitsList[u];
+                                if (splashUnit.FactionId != unit.FactionId && splashUnit.IsAlive)
+                                {
+                                    float distSq = targetBuilding.Position.DistanceSquaredTo(splashUnit.Position);
+                                    if (distSq <= splashRadiusSq)
+                                    {
+                                        float dist = MathF.Sqrt(distSq);
+                                        float splashUnitDmg = CombatFormulas.CalculateAreaOfEffectDamage(unit.AttackDamage, dist, splashRadius);
+                                        splashUnit.TakeCombatDamage(splashUnitDmg, unit.Id, unit.FactionId, tick, _eventBus, out bool killedSplash);
+                                        targetsHit++;
+                                        totalSplashDmg += splashUnitDmg;
+                                        if (killedSplash)
+                                        {
+                                            ApplyNearbyCasualtyMoraleShock(splashUnit, tick);
+                                        }
+                                    }
+                                }
+                            }
+
+                            _eventBus.Publish(new SiegeAreaOfEffectImpactEvent(tick, unit.Id, unit.FactionId, targetBuilding.Position, splashRadius, targetsHit, totalSplashDmg));
+                        }
+
+                        if (destroyed)
+                        {
+                            if (targetBuilding.IsWall)
+                            {
+                                var (gx, gy) = _state.TerrainGrid.WorldToGrid(targetBuilding.Position);
+                                _state.TerrainGrid.SetTerrain(gx, gy, TerrainType.Rubble);
+                                _state.AddBreach(new BreachEntity(targetBuilding.Id, targetBuilding.FactionId, targetBuilding.Position, targetBuilding.BuildingType, tick));
+                                _eventBus.Publish(new WallBreachedEvent(tick, targetBuilding.Id, targetBuilding.FactionId, targetBuilding.Position, targetBuilding.BuildingType));
+                            }
+
+                            unit.AttackTargetId = EntityId.None;
+                            unit.State = UnitState.Idle;
+                        }
+                    }
+                }
+                else
+                {
+                    unit.AttackTargetId = EntityId.None;
+                    unit.State = UnitState.Idle;
+                    unit.Charge.Reset();
+                }
+            }
+        }
+    }
+
+    private void UpdateTowers(ulong tick)
+    {
+        var buildings = _state.ActiveBuildings;
+        int count = buildings.Count;
+
+        for (int i = 0; i < count; i++)
+        {
+            var b = buildings[i];
+            if (!b.IsAlive || !b.IsConstructed || !b.IsTower || b.TowerDefense == null) continue;
+
+            var tower = b.TowerDefense;
+            tower.DecrementCooldown();
+
+            if (tower.CooldownRemaining <= 0)
+            {
+                UnitEntity? nearestEnemy = null;
+                float nearestDistSq = float.MaxValue;
+                float rangeSq = tower.AttackRange * tower.AttackRange;
+
+                var units = _state.ActiveUnits;
+                for (int u = 0; u < units.Count; u++)
+                {
+                    var unit = units[u];
+                    if (unit.FactionId != b.FactionId && unit.IsAlive)
+                    {
+                        float distSq = b.Position.DistanceSquaredTo(unit.Position);
+                        if (distSq <= rangeSq && distSq < nearestDistSq)
+                        {
+                            nearestDistSq = distSq;
+                            nearestEnemy = unit;
+                        }
+                    }
+                }
+
+                if (nearestEnemy != null)
+                {
+                    tower.ResetCooldown();
+                    float damage = tower.IsBallistaTower
+                        ? CombatFormulas.CalculateArmorPiercingDamage(tower.EffectiveDamage, nearestEnemy.Armor, 0.60f)
+                        : CombatFormulas.CalculateEffectiveDamage(tower.EffectiveDamage, nearestEnemy.Armor);
+
+                    nearestEnemy.TakeCombatDamage(damage, b.Id, b.FactionId, tick, _eventBus, out bool killed);
+                    _eventBus.Publish(new TowerAttackEvent(tick, b.Id, b.FactionId, nearestEnemy.Id, damage, nearestEnemy.Position));
+
+                    if (killed)
+                    {
+                        ApplyNearbyCasualtyMoraleShock(nearestEnemy, tick);
                     }
                 }
             }
@@ -2275,6 +2594,62 @@ public sealed class SimulationEngine
                 new ResourceCost(Wood: 50, Stone: 125),
                 Array.Empty<ResourceType>()),
 
+            "guard_tower" => (
+                new Vector2D(2f, 2f),
+                1000f,
+                80f,
+                0,
+                new ResourceCost(Wood: 100, Stone: 200),
+                Array.Empty<ResourceType>()),
+
+            "ballista_tower" => (
+                new Vector2D(2f, 2f),
+                1400f,
+                100f,
+                0,
+                new ResourceCost(Wood: 120, Stone: 250, Iron: 50),
+                Array.Empty<ResourceType>()),
+
+            "wooden_wall" => (
+                new Vector2D(1f, 1f),
+                500f,
+                30f,
+                0,
+                new ResourceCost(Wood: 20),
+                Array.Empty<ResourceType>()),
+
+            "stone_wall" => (
+                new Vector2D(1f, 1f),
+                1200f,
+                50f,
+                0,
+                new ResourceCost(Stone: 30),
+                Array.Empty<ResourceType>()),
+
+            "wooden_gate" => (
+                new Vector2D(2f, 1f),
+                800f,
+                45f,
+                0,
+                new ResourceCost(Wood: 50),
+                Array.Empty<ResourceType>()),
+
+            "stone_gate" => (
+                new Vector2D(2f, 1f),
+                2000f,
+                70f,
+                0,
+                new ResourceCost(Stone: 100, Iron: 25),
+                Array.Empty<ResourceType>()),
+
+            "siege_workshop" => (
+                new Vector2D(3f, 3f),
+                900f,
+                100f,
+                0,
+                new ResourceCost(Wood: 200, Stone: 100, Iron: 50),
+                Array.Empty<ResourceType>()),
+
             _ => (
                 new Vector2D(2f, 2f),
                 300f,
@@ -2319,6 +2694,18 @@ public sealed class SimulationEngine
         if (lower.Contains("veles"))
         {
             return (new ResourceCost(Food: 40, Gold: 40), 70, 1);
+        }
+        if (lower.Contains("ram"))
+        {
+            return (new ResourceCost(Wood: 150, Gold: 50), 100, 2);
+        }
+        if (lower.Contains("catapult") || lower.Contains("onager"))
+        {
+            return (new ResourceCost(Wood: 200, Gold: 100, Iron: 50), 120, 3);
+        }
+        if (lower.Contains("ballista") || lower.Contains("scorpion"))
+        {
+            return (new ResourceCost(Wood: 150, Gold: 80, Iron: 40), 100, 2);
         }
 
         // Default Swordsman

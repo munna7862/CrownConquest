@@ -38,6 +38,14 @@ public sealed class BuildingEntity
     public int FarmReseedCost { get; }
     public bool IsFarmDepleted => IsFarm && FarmFoodRemaining <= 0;
 
+    public bool IsWall { get; }
+    public bool IsGate { get; }
+    public bool IsTower { get; }
+    public bool IsSiegeWorkshop { get; }
+
+    public GateDefenseState? GateDefense { get; }
+    public TowerDefenseState? TowerDefense { get; }
+
     public ProductionQueue ProductionQueue { get; }
     public ResearchQueue ResearchQueue { get; }
     public Vector2D RallyPoint { get; set; }
@@ -60,7 +68,9 @@ public sealed class BuildingEntity
         ResourceCost? baseCost = null,
         bool isFarm = false,
         int maxFarmFood = 250,
-        int farmReseedCost = 60)
+        int farmReseedCost = 60,
+        GateDefenseState? gateDefense = null,
+        TowerDefenseState? towerDefense = null)
     {
         Id = id;
         FactionId = factionId;
@@ -76,6 +86,42 @@ public sealed class BuildingEntity
         MaxFarmFood = maxFarmFood;
         FarmFoodRemaining = IsFarm ? maxFarmFood : 0;
         FarmReseedCost = farmReseedCost;
+
+        IsWall = buildingType.Contains("wall", StringComparison.OrdinalIgnoreCase);
+        IsGate = buildingType.Contains("gate", StringComparison.OrdinalIgnoreCase);
+        IsTower = buildingType.Contains("tower", StringComparison.OrdinalIgnoreCase);
+        IsSiegeWorkshop = buildingType.Contains("siege_workshop", StringComparison.OrdinalIgnoreCase);
+
+        if (gateDefense != null)
+        {
+            GateDefense = gateDefense;
+        }
+        else if (IsGate)
+        {
+            GateDefense = new GateDefenseState();
+        }
+
+        if (towerDefense != null)
+        {
+            TowerDefense = towerDefense;
+        }
+        else if (IsTower)
+        {
+            var lower = buildingType.ToLowerInvariant();
+            if (lower.Contains("ballista"))
+            {
+                TowerDefense = new TowerDefenseState(baseAttackDamage: 35f, attackRange: 11.0f, attackCooldownTicks: 30, maxGarrisonCapacity: 5, isBallistaTower: true);
+            }
+            else if (lower.Contains("guard"))
+            {
+                TowerDefense = new TowerDefenseState(baseAttackDamage: 18f, attackRange: 9.0f, attackCooldownTicks: 18, maxGarrisonCapacity: 5);
+            }
+            else
+            {
+                TowerDefense = new TowerDefenseState(baseAttackDamage: 12f, attackRange: 8.0f, attackCooldownTicks: 20, maxGarrisonCapacity: 4);
+            }
+        }
+
         ProductionQueue = new ProductionQueue(maxQueueSize: 5);
         ResearchQueue = new ResearchQueue(maxQueueSize: 5);
         RallyPoint = rallyPoint ?? new Vector2D(position.X + (gridSize.X * 0.5f) + 1.5f, position.Y);

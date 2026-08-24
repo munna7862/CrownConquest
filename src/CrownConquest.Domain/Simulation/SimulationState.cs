@@ -20,6 +20,7 @@ public sealed class SimulationState
 
     private readonly Dictionary<EntityId, BuildingEntity> _buildings = new(128);
     private readonly List<BuildingEntity> _activeBuildingList = new(128);
+    private readonly List<BreachEntity> _breaches = new(64);
 
     private readonly Dictionary<FactionId, ResourceBank> _resourceBanks = new(8);
     private readonly Dictionary<FactionId, PopulationManager> _populationManagers = new(8);
@@ -38,6 +39,7 @@ public sealed class SimulationState
 
     public IReadOnlyDictionary<EntityId, BuildingEntity> Buildings => _buildings;
     public IReadOnlyList<BuildingEntity> ActiveBuildings => _activeBuildingList;
+    public IReadOnlyList<BreachEntity> Breaches => _breaches;
 
     public IReadOnlyDictionary<FactionId, ResourceBank> ResourceBanks => _resourceBanks;
     public IReadOnlyDictionary<FactionId, PopulationManager> PopulationManagers => _populationManagers;
@@ -45,6 +47,12 @@ public sealed class SimulationState
     public IReadOnlyDictionary<FactionId, FactionTechManager> TechManagers => _techManagers;
 
     public EntityId GenerateEntityId() => new(_nextEntityId++);
+
+    public void AddBreach(BreachEntity breach)
+    {
+        ArgumentNullException.ThrowIfNull(breach);
+        _breaches.Add(breach);
+    }
 
     public ResourceBank GetOrCreateResourceBank(FactionId factionId)
     {
@@ -211,6 +219,25 @@ public sealed class SimulationState
             hash = (hash ^ (ulong)BitConverter.SingleToInt32Bits(b.CurrentBuildProgress)) * 1099511628211UL;
             hash = (hash ^ (ulong)b.ProductionQueue.Count) * 1099511628211UL;
             hash = (hash ^ (ulong)b.ResearchQueue.Count) * 1099511628211UL;
+            if (b.GateDefense != null)
+            {
+                hash = (hash ^ (ulong)b.GateDefense.State) * 1099511628211UL;
+            }
+            if (b.TowerDefense != null)
+            {
+                hash = (hash ^ (ulong)b.TowerDefense.CooldownRemaining) * 1099511628211UL;
+                hash = (hash ^ (ulong)b.TowerDefense.GarrisonCount) * 1099511628211UL;
+            }
+        }
+
+        // Breaches checksum
+        for (int i = 0; i < _breaches.Count; i++)
+        {
+            var breach = _breaches[i];
+            hash = (hash ^ (ulong)breach.WallEntityId.Value) * 1099511628211UL;
+            hash = (hash ^ (ulong)breach.DefendingFactionId.Value) * 1099511628211UL;
+            hash = (hash ^ (ulong)BitConverter.SingleToInt32Bits(breach.Position.X)) * 1099511628211UL;
+            hash = (hash ^ (ulong)BitConverter.SingleToInt32Bits(breach.Position.Y)) * 1099511628211UL;
         }
 
         // Resource nodes checksum
