@@ -340,5 +340,85 @@ public static class DataLoader
         string json = File.ReadAllText(filePath);
         return LoadHeroesFromJson(json);
     }
+
+    public static Result<List<TerrainDefinitionModel>> LoadTerrainFromJson(string json)
+    {
+        try
+        {
+            var terrains = JsonSerializer.Deserialize<List<TerrainDefinitionModel>>(json, JsonOptions);
+            if (terrains == null || terrains.Count == 0)
+            {
+                return Result<List<TerrainDefinitionModel>>.Failure(new GameError("EMPTY_DATA", "Terrain definition is empty."));
+            }
+
+            foreach (var t in terrains)
+            {
+                if (string.IsNullOrWhiteSpace(t.Id))
+                {
+                    return Result<List<TerrainDefinitionModel>>.Failure(new GameError("INVALID_TERRAIN_ID", "Terrain ID cannot be empty."));
+                }
+                if (t.MovementSpeedMultiplier < 0f)
+                {
+                    return Result<List<TerrainDefinitionModel>>.Failure(new GameError("INVALID_TERRAIN_STATS", $"Invalid movement multiplier for terrain {t.Id}."));
+                }
+            }
+
+            return Result<List<TerrainDefinitionModel>>.Success(terrains);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<TerrainDefinitionModel>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<TerrainDefinitionModel>> LoadTerrainFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<TerrainDefinitionModel>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadTerrainFromJson(json);
+    }
+
+    public static Result<List<FormationDefinitionModel>> LoadFormationsFromJson(string json)
+    {
+        try
+        {
+            var formations = JsonSerializer.Deserialize<List<FormationDefinitionModel>>(json, JsonOptions);
+            if (formations == null || formations.Count == 0)
+            {
+                return Result<List<FormationDefinitionModel>>.Failure(new GameError("EMPTY_DATA", "Formations definition is empty."));
+            }
+
+            foreach (var f in formations)
+            {
+                if (string.IsNullOrWhiteSpace(f.Id))
+                {
+                    return Result<List<FormationDefinitionModel>>.Failure(new GameError("INVALID_FORMATION_ID", "Formation ID cannot be empty."));
+                }
+                if (f.MovementSpeedMultiplier <= 0f)
+                {
+                    return Result<List<FormationDefinitionModel>>.Failure(new GameError("INVALID_FORMATION_STATS", $"Invalid movement multiplier for formation {f.Id}."));
+                }
+            }
+
+            return Result<List<FormationDefinitionModel>>.Success(formations);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<FormationDefinitionModel>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<FormationDefinitionModel>> LoadFormationsFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<FormationDefinitionModel>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadFormationsFromJson(json);
+    }
 }
 

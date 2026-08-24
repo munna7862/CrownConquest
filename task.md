@@ -1,59 +1,39 @@
-# Sprint 05: RPG Hero Layer — Task Breakdown
+# Sprint 06 Task Backlog & Execution Tracking: Tactical Combat
 
-## Backlog Stories & Specialist Ownership
-
-| Story ID | Description | Primary Owner | Status |
-|:---|:---|:---|:---|
-| **CNC-0501** | Hero Model & Class Archetypes (`HeroClass`, `HeroAttributes`, `HeroState`, `UnitArchetype.Hero`) | `hero` | Complete |
-| **CNC-0502** | Hero XP Progression Curve & Squad Shared Kill XP Attribution | `combat` | Complete |
-| **CNC-0503** | Hero Levels & Immediate Level-Up State Machine (`HeroLevelUpEvent`) | `ui` / `game-systems` | Complete |
-| **CNC-0504** | RPG Core Attributes (STR, AGI, WIL) & Derived Stat Scaling Formulas | `hero` | Complete |
-| **CNC-0505** | Hero Abilities Data Schema & Runtime State (`abilities.json`, `heroes.json`, `HeroAbilityDefinition`) | `combat` / `data` | Complete |
-| **CNC-0506** | Simulation Cooldown Timers & Deterministic Fixed-Tick Mana Regeneration | `ui` / `game-systems` | Complete |
-| **CNC-0507** | Leadership Capacity, Squad Attachment & Battlefield Leadership Auras | `hero` / `combat` | Complete |
-| **CNC-0508** | Offensive & Support Ability Execution (`HeroicStrike`, `WarCry`, `EarthMend`) | `combat` | Complete |
-| **CNC-0509** | Presentation: Hero UI Presenter, Ability Cards & Selection Synchronization | `ui` | Complete |
-| **CNC-0510** | Persistence, State Checksum Integration & Headless Progression E2E Scenario | `hero` / `qa` | Complete |
+**Status:** COMPLETE (100% DoD Achieved)  
+**Branch:** `feature/sprint-06-tactical-combat`  
+**Cumulative Test Count:** 138 / 138 Passing (100% Green)
 
 ---
 
-## Detailed Subtasks
+## 1. Sprint Backlog & Story Ownership Matrix
 
-### 1. Pre-Implementation QA Catalog
-- [x] Create `docs/testing/test_cases_catalog_S05.md` detailing 18 test cases across Tiers 1-4.
+| Story / Task ID | Task Description | Owner Persona | Status | Artifact / Link |
+|:---|:---|:---:|:---:|:---|
+| **S06-01** | Data Definitions (`terrain.json`, `formations.json`) & DTO Models | ARCH / SDE | `[x]` | [`terrain.json`](file:///c:/Workspace/CrownConquest/data/definitions/terrain.json), [`formations.json`](file:///c:/Workspace/CrownConquest/data/definitions/formations.json) |
+| **S06-02** | DataLoader JSON Parsing Methods (`LoadTerrain`, `LoadFormations`) | SDE | `[x]` | [`DataLoader.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Data/Loaders/DataLoader.cs) |
+| **S06-03** | Domain Models (`TerrainType`, `TerrainGrid`, `FormationType`, `FormationCalculator`) | ARCH / SDE | `[x]` | [`TerrainGrid.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Combat/TerrainGrid.cs), [`FormationCalculator.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Combat/FormationCalculator.cs) |
+| **S06-04** | Morale System & State Machine (`MoraleState`, `MoraleLevel`, Shock & Recovery) | ARCH / SDE | `[x]` | [`MoraleState.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Combat/MoraleState.cs) |
+| **S06-05** | Cavalry Charge Momentum & Spear Bracing Counter (`ChargeState`, Recoil) | ARCH / SDE | `[x]` | [`ChargeState.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Combat/ChargeState.cs) |
+| **S06-06** | Tactical Combat Formulas (`CalculateTacticalCombatDamage`, Elevation, Cover) | ARCH / SDE | `[x]` | [`CombatFormulas.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Combat/CombatFormulas.cs) |
+| **S06-07** | Unit Entity & Commands/Events Integration (`TakeRecoilDamage`, Commands/Events) | SDE | `[x]` | [`UnitEntity.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Entities/UnitEntity.cs), [`TacticalCombatCommands.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Commands/TacticalCombatCommands.cs), [`TacticalCombatEvents.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Events/TacticalCombatEvents.cs) |
+| **S06-08** | Authoritative Simulation Engine Updates (`UpdateMorale`, Checksums) | ARCH / SDE | `[x]` | [`SimulationEngine.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Simulation/SimulationEngine.cs), [`SimulationState.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Domain/Simulation/SimulationState.cs) |
+| **S06-09** | Presentation Tactical Presenter & Headless Scenario | SDE | `[x]` | [`TacticalCombatPresenter.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Presentation/TacticalCombatPresenter.cs), [`TacticalCombatScenario.cs`](file:///c:/Workspace/CrownConquest/src/CrownConquest.Presentation/TacticalCombatScenario.cs) |
+| **S06-10** | Pre-Implementation Test Cases Catalog Authoring | SDET | `[x]` | [`test_cases_catalog_S06.md`](file:///c:/Workspace/CrownConquest/docs/testing/test_cases_catalog_S06.md) |
+| **S06-11** | Zero-Allocation Hot-Loop & Memory Footprint Audit | PERF | `[x]` | Zero heap allocations verified in simulation loops |
+| **S06-12** | Test Automation Suite Implementation (Tiers 1–4) & 1000-Tick Replay Parity | SDET | `[x]` | 138/138 Passed (`dotnet test`) |
+| **S06-13** | Game Director & PO Acceptance Sign-Off | GD/PO | `[x]` | Formal sign-off granted |
+| **S06-14** | DevOps Branch Commit, Push, and PR Creation | DO | `[x]` | [`pr_S06_tactical_combat.md`](file:///c:/Workspace/CrownConquest/docs/pull_requests/pr_S06_tactical_combat.md) |
 
-### 2. Data Definitions & Models
-- [x] Create `data/definitions/abilities.json` (heroic_strike, war_cry, earth_mend, roots_of_fury, shield_bash, pilum_volley).
-- [x] Create `data/definitions/heroes.json` (celtic_warlord, celtic_druid, roman_centurion).
-- [x] Update `data/definitions/units.json` and `xp_curves.json` with Hero unit definitions and progression curves.
-- [x] Create `AbilityDefinitionModel.cs` and `HeroDefinition.cs` in Data layer.
-- [x] Update `DataLoader.cs` (`LoadHeroesFromJson`, `LoadAbilitiesFromJson`) and `UnitFactory.cs` (`CreateHeroUnit`).
+---
 
-### 3. Domain Models & Systems
-- [x] Create `HeroClass` enum and display helpers.
-- [x] Create `HeroAttributes` readonly struct with derived formulas (Health, Damage, Armor, Speed, Cooldown Reduction, Max Mana, Mana Regen, Potency).
-- [x] Create `HeroAura`, `HeroAbilityDefinition`, `HeroAbilityState`, and `HeroState` domain entities.
-- [x] Update `UnitArchetype` with `Hero` and `UnitEntity` with `HeroState`, `IsHero`, and attribute bonuses.
-- [x] Update `CombatFormulas` with `CalculateHeroSpellDamage` and `CalculateCombatDamageWithAura`.
+## 2. Multi-Agent Persona Handoff Log
 
-### 4. Commands & Events
-- [x] Create `AttachToHeroCommand`, `DetachFromHeroCommand`, `CastHeroAbilityCommand`, `AllocateHeroAttributeCommand`.
-- [x] Create `HeroLevelUpEvent`, `HeroAbilityCastEvent`, `HeroAttachedUnitsChangedEvent`, `HeroFallenEvent`, `HeroAttributeAllocatedEvent`.
-
-### 5. Simulation Engine & State
-- [x] Add hero command handlers in `SimulationEngine.ExecuteCommand`.
-- [x] Implement fixed-tick mana regeneration and cooldown ticking (`UpdateHeroes`).
-- [x] Implement leadership aura bonus query (`GetUnitAuraModifiers`).
-- [x] Implement shared squad kill XP and level-up handling in `UpdateCombat`.
-- [x] Include Hero attributes, mana, cooldowns, and attached squad in `SimulationState.ComputeStateChecksum`.
-
-### 6. Presentation & Scenarios
-- [x] Implement `HeroPresenter` providing hero HUD view models and ability card state.
-- [x] Implement `HeroProgressionScenario` E2E headless scenario.
-
-### 7. Automated Testing & Verification
-- [x] Tier 1: Unit tests for Hero Attributes (`HeroAttributesMathTests.cs`), Abilities (`HeroAbilityMathTests.cs`), and Auras (`HeroAuraMathTests.cs`).
-- [x] Tier 2: Simulation Invariant tests for mana conservation, cooldowns, capacity, aura disruption, and 1000-tick replay parity (`HeroInvariantTests.cs`).
-- [x] Tier 3: Combat integration tests for squad attachment aura buffs, AoE offensive damage, AoE healing, and kill XP leveling (`HeroCombatIntegrationTests.cs`).
-- [x] Tier 4: Headless E2E scenario test (`HeroProgressionScenarioTests.cs`) and Data loading tests (`HeroDataLoaderTests.cs`).
-- [x] Verify `dotnet test` passes with 100% green tests (119/119 passed).
+1. **Stage 1 (SM -> GD):** Verified clean baseline (119/119 tests passing), checked out `feature/sprint-06-tactical-combat`, and deconstructed sprint backlog.
+2. **Stage 2 (GD/ARCH -> SDET):** Aligned mathematical formulas for terrain modifiers, formation offsets, morale thresholds, elevation advantages, and cavalry charge vs spear bracing.
+3. **Stage 3 (SDET -> SDE):** Authored pre-implementation test cases catalog [`test_cases_catalog_S06.md`](file:///c:/Workspace/CrownConquest/docs/testing/test_cases_catalog_S06.md) with 18 test cases across Tiers 1–4.
+4. **Stage 4 (SDE -> PERF):** Implemented Data, Domain, Commands, Events, Simulation Engine, and Presentation layers; verified clean build (0 warnings, 0 errors).
+5. **Stage 5 (PERF -> SDET):** Audited hot loops (`UpdateMovements`, `UpdateCombat`, `UpdateMorale`) for 0 per-tick heap allocations and $< 500\text{ MB}$ memory bounds.
+6. **Stage 6 (SDET -> GD):** Implemented automated test suites across Tiers 1–4, verified 1000-tick replay checksum equality, and achieved 100% green pass rate (138/138 tests).
+7. **Stage 7 (GD -> DO):** Game Director reviewed acceptance criteria and formally approved sprint release.
+8. **Stage 8 (DO -> User):** Produced PR documentation, executed atomic commits, pushed feature branch to origin, and opened Pull Request via `gh pr create`.
