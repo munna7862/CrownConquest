@@ -23,7 +23,7 @@
 | **S06-11** | Zero-Allocation Hot-Loop & Memory Footprint Audit | PERF | `[x]` | Zero heap allocations verified in simulation loops |
 | **S06-12** | Test Automation Suite Implementation (Tiers 1–4) & 1000-Tick Replay Parity | SDET | `[x]` | 138/138 Passed (`dotnet test`) |
 | **S06-13** | Game Director & PO Acceptance Sign-Off | GD/PO | `[x]` | Formal sign-off granted |
-| **S06-14** | DevOps Branch Commit, Push, and PR Creation | DO | `[x]` | [`pr_S06_tactical_combat.md`](file:///c:/Workspace/CrownConquest/docs/pull_requests/pr_S06_tactical_combat.md) |
+| **S06-14** | DevOps Branch Commit, Push, and PR Creation | DO | `[x]` | [PR #7](https://github.com/munna7862/CrownConquest/pull/7), [`pr_S06_tactical_combat.md`](file:///c:/Workspace/CrownConquest/docs/pull_requests/pr_S06_tactical_combat.md) |
 
 ---
 
