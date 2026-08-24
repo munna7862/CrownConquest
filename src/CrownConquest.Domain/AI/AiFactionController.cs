@@ -56,31 +56,41 @@ public sealed class AiFactionController
     /// </summary>
     public void Update(SimulationState state, CommandQueue commandQueue, ulong currentTick)
     {
+        UpdateScheduled(state, commandQueue, currentTick, 0);
+    }
+
+    /// <summary>
+    /// Executes staggered AI decision logic with a specific faction tick offset.
+    /// </summary>
+    public void UpdateScheduled(SimulationState state, CommandQueue commandQueue, ulong currentTick, int tickOffset)
+    {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(commandQueue);
 
         if (!IsActive) return;
 
-        // 1. Perception update (every 5 ticks)
-        if (currentTick % 5 == 0)
+        ulong adjustedTick = currentTick + (ulong)Math.Abs(tickOffset);
+
+        // 1. Perception update (every 6 ticks)
+        if (adjustedTick % (ulong)AiUpdateScheduler.PerceptionIntervalTicks == 0)
         {
             Perception.UpdatePerception(state, currentTick);
         }
 
-        // 2. Economy & Worker AI (every 10 ticks)
-        if (currentTick % 10 == 0)
+        // 2. Economy & Worker AI (every 12 ticks)
+        if (adjustedTick % (ulong)AiUpdateScheduler.EconomyIntervalTicks == 0)
         {
             UpdateEconomyAndWorkers(state, commandQueue, currentTick);
         }
 
-        // 3. Build Orders & Production AI (every 10 ticks, offset by 5)
-        if (currentTick % 10 == 5)
+        // 3. Build Orders & Production AI (every 12 ticks, offset by 6)
+        if ((adjustedTick + (ulong)(AiUpdateScheduler.EconomyIntervalTicks / 2)) % (ulong)AiUpdateScheduler.ProductionIntervalTicks == 0)
         {
             UpdateBuildOrdersAndProduction(state, commandQueue, currentTick);
         }
 
-        // 4. Military & Tactical Combat AI (every 5 ticks)
-        if (currentTick % 5 == 0)
+        // 4. Military & Tactical Combat AI (every 4 ticks)
+        if (adjustedTick % (ulong)AiUpdateScheduler.TacticsIntervalTicks == 0)
         {
             UpdateArmyAndTactics(state, commandQueue, currentTick);
         }
