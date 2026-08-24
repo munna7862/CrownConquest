@@ -53,6 +53,48 @@ public sealed class SerializedTreasuryData
     public int Iron { get; set; }
 }
 
+public sealed class SerializedMissionData
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string Type { get; set; } = "Defend";
+    public string IssuingFactionId { get; set; } = string.Empty;
+    public string? TargetFactionId { get; set; }
+    public string TargetProvinceId { get; set; } = string.Empty;
+    public string? DestinationProvinceId { get; set; }
+    public int DurationTicks { get; set; }
+    public int TargetQuantity { get; set; }
+    public int RequiredFood { get; set; }
+    public int RequiredIron { get; set; }
+    public int RequiredGold { get; set; }
+    public int GoldReward { get; set; }
+    public int XpReward { get; set; }
+    public int ReputationReward { get; set; }
+    public bool IsPrimaryCampaign { get; set; }
+
+    public string Status { get; set; } = "Inactive";
+    public int StartTick { get; set; }
+    public int ElapsedTicks { get; set; }
+    public int CurrentProgress { get; set; }
+    public int CompletedTick { get; set; }
+    public int FailedTick { get; set; }
+    public string? FailureReason { get; set; }
+    public int? AssignedArmyId { get; set; }
+}
+
+public sealed class SerializedFactionData
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Culture { get; set; } = string.Empty;
+    public string HomeProvinceId { get; set; } = string.Empty;
+    public int Reputation { get; set; }
+    public string ColorHex { get; set; } = string.Empty;
+    public double TradeModifier { get; set; } = 1.0;
+    public string Description { get; set; } = string.Empty;
+}
+
 public sealed class CampaignSaveData
 {
     public int SimulationTick { get; set; }
@@ -61,10 +103,12 @@ public sealed class CampaignSaveData
     public List<SerializedProvinceData> Provinces { get; set; } = new();
     public List<SerializedArmyData> Armies { get; set; } = new();
     public List<SerializedTreasuryData> Treasuries { get; set; } = new();
+    public List<SerializedMissionData> Missions { get; set; } = new();
+    public List<SerializedFactionData> Factions { get; set; } = new();
 }
 
 /// <summary>
-/// Deterministic JSON serializer and deserializer for campaign save states.
+/// Deterministic JSON serializer and deserializer for campaign save states including missions and diplomacy.
 /// </summary>
 public static class CampaignSerializer
 {
@@ -150,6 +194,56 @@ public static class CampaignSerializer
             });
         }
 
+        // Missions serialization
+        foreach (var mState in engine.Missions.GetAllMissions())
+        {
+            var mDef = mState.Definition;
+            data.Missions.Add(new SerializedMissionData
+            {
+                Id = mDef.Id,
+                Name = mDef.Name,
+                Description = mDef.Description,
+                Type = mDef.Type.ToString(),
+                IssuingFactionId = mDef.IssuingFactionId,
+                TargetFactionId = mDef.TargetFactionId,
+                TargetProvinceId = mDef.TargetProvinceId.Value,
+                DestinationProvinceId = mDef.DestinationProvinceId?.Value,
+                DurationTicks = mDef.DurationTicks,
+                TargetQuantity = mDef.TargetQuantity,
+                RequiredFood = mDef.RequiredResources.Food,
+                RequiredIron = mDef.RequiredResources.Iron,
+                RequiredGold = mDef.RequiredResources.Gold,
+                GoldReward = mDef.GoldReward,
+                XpReward = mDef.XpReward,
+                ReputationReward = mDef.ReputationReward,
+                IsPrimaryCampaign = mDef.IsPrimaryCampaign,
+                Status = mState.Status.ToString(),
+                StartTick = mState.StartTick,
+                ElapsedTicks = mState.ElapsedTicks,
+                CurrentProgress = mState.CurrentProgress,
+                CompletedTick = mState.CompletedTick,
+                FailedTick = mState.FailedTick,
+                FailureReason = mState.FailureReason,
+                AssignedArmyId = mState.AssignedArmyId?.Value
+            });
+        }
+
+        // Factions & Diplomacy serialization
+        foreach (var fDef in engine.Diplomacy.GetAllFactions())
+        {
+            data.Factions.Add(new SerializedFactionData
+            {
+                Id = fDef.Id,
+                Name = fDef.Name,
+                Culture = fDef.Culture,
+                HomeProvinceId = fDef.HomeProvinceId.Value,
+                Reputation = engine.Diplomacy.GetReputation(fDef.Id),
+                ColorHex = fDef.ColorHex,
+                TradeModifier = fDef.TradeModifier,
+                Description = fDef.Description
+            });
+        }
+
         return JsonSerializer.Serialize(data, JsonOptions);
     }
 
@@ -198,7 +292,10 @@ public static class CampaignSerializer
             }
 
             var map = new StrategicMap(provinces);
-            var engine = new CampaignEngine(map, ticksPerTurn: data.TicksPerTurn);
+            var diplomacy = new FactionDiplomacyManager();
+            var missions = new MissionEngine();
+
+            var engine = new CampaignEngine(map, diplomacy: diplomacy, missions: missions, ticksPerTurn: data.TicksPerTurn);
             engine.RestoreTickState(data.SimulationTick, data.CampaignTurn);
 
             // Restore treasuries
@@ -207,6 +304,75 @@ public static class CampaignSerializer
                 var faction = int.TryParse(tData.FactionId, out int tVal) ? new FactionId(tVal) : FactionId.Neutral;
                 var inv = new ResourceCost(Food: tData.Food, Wood: tData.Wood, Gold: tData.Gold, Stone: tData.Stone, Iron: tData.Iron);
                 engine.SetTreasury(faction, inv);
+            }
+
+            // Restore factions
+            if (data.Factions != null)
+            {
+                foreach (var fData in data.Factions)
+                {
+                    var fDef = new FactionDefinition(
+                        fData.Id,
+                        fData.Name,
+                        fData.Culture,
+                        new ProvinceId(fData.HomeProvinceId),
+                        fData.Reputation,
+                        fData.ColorHex,
+                        fData.TradeModifier,
+                        fData.Description
+                    );
+                    diplomacy.RegisterFaction(fDef);
+                    diplomacy.SetReputation(fData.Id, fData.Reputation);
+                }
+            }
+
+            // Restore missions
+            if (data.Missions != null)
+            {
+                foreach (var mData in data.Missions)
+                {
+                    Enum.TryParse<MissionType>(mData.Type, true, out var mType);
+                    Enum.TryParse<MissionStatus>(mData.Status, true, out var mStatus);
+
+                    var mDef = new MissionDefinition(
+                        mData.Id,
+                        mData.Name,
+                        mData.Description,
+                        mType,
+                        mData.IssuingFactionId,
+                        mData.TargetFactionId,
+                        new ProvinceId(mData.TargetProvinceId),
+                        !string.IsNullOrEmpty(mData.DestinationProvinceId) ? new ProvinceId(mData.DestinationProvinceId) : null as ProvinceId?,
+                        mData.DurationTicks,
+                        mData.TargetQuantity,
+                        new ResourceCost(Food: mData.RequiredFood, Iron: mData.RequiredIron, Gold: mData.RequiredGold),
+                        mData.GoldReward,
+                        mData.XpReward,
+                        mData.ReputationReward,
+                        mData.IsPrimaryCampaign
+                    );
+
+                    missions.RegisterMission(mDef);
+                    if (missions.TryGetMission(mData.Id, out var rState) && rState != null)
+                    {
+                        rState.Status = mStatus;
+                        rState.StartTick = mData.StartTick;
+                        rState.ElapsedTicks = mData.ElapsedTicks;
+                        rState.CurrentProgress = mData.CurrentProgress;
+                        rState.CompletedTick = mData.CompletedTick;
+                        rState.FailedTick = mData.FailedTick;
+                        rState.FailureReason = mData.FailureReason;
+                        if (mData.AssignedArmyId.HasValue)
+                        {
+                            rState.AssignedArmyId = new StrategicArmyId(mData.AssignedArmyId.Value);
+                        }
+
+                        if (mStatus == MissionStatus.Active)
+                        {
+                            missions.AcceptMission(mData.Id, mData.StartTick, rState.AssignedArmyId);
+                        }
+                    }
+                }
             }
 
             // Restore armies

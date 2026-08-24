@@ -500,6 +500,87 @@ public static class DataLoader
         string json = File.ReadAllText(filePath);
         return LoadProvincesFromJson(json);
     }
+
+    public static Result<List<MissionDefinitionModel>> LoadMissionsFromJson(string json)
+    {
+        try
+        {
+            var missions = JsonSerializer.Deserialize<List<MissionDefinitionModel>>(json, JsonOptions);
+            if (missions == null || missions.Count == 0)
+            {
+                return Result<List<MissionDefinitionModel>>.Failure(new GameError("EMPTY_DATA", "Missions definition is empty."));
+            }
+
+            foreach (var m in missions)
+            {
+                if (string.IsNullOrWhiteSpace(m.Id))
+                {
+                    return Result<List<MissionDefinitionModel>>.Failure(new GameError("INVALID_MISSION_ID", "Mission ID cannot be empty."));
+                }
+                if (m.DurationTicks <= 0)
+                {
+                    return Result<List<MissionDefinitionModel>>.Failure(new GameError("INVALID_MISSION_DURATION", $"Invalid duration for mission {m.Id}."));
+                }
+            }
+
+            return Result<List<MissionDefinitionModel>>.Success(missions);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<MissionDefinitionModel>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<MissionDefinitionModel>> LoadMissionsFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<MissionDefinitionModel>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadMissionsFromJson(json);
+    }
+
+    public static Result<List<FactionDefinitionModel>> LoadFactionsFromJson(string json)
+    {
+        try
+        {
+            var factions = JsonSerializer.Deserialize<List<FactionDefinitionModel>>(json, JsonOptions);
+            if (factions == null || factions.Count == 0)
+            {
+                return Result<List<FactionDefinitionModel>>.Failure(new GameError("EMPTY_DATA", "Factions definition is empty."));
+            }
+
+            foreach (var f in factions)
+            {
+                if (string.IsNullOrWhiteSpace(f.Id))
+                {
+                    return Result<List<FactionDefinitionModel>>.Failure(new GameError("INVALID_FACTION_ID", "Faction ID cannot be empty."));
+                }
+                if (f.InitialReputation < -100 || f.InitialReputation > 100)
+                {
+                    return Result<List<FactionDefinitionModel>>.Failure(new GameError("INVALID_FACTION_REPUTATION", $"Invalid initial reputation for faction {f.Id}."));
+                }
+            }
+
+            return Result<List<FactionDefinitionModel>>.Success(factions);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<FactionDefinitionModel>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<FactionDefinitionModel>> LoadFactionsFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<FactionDefinitionModel>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadFactionsFromJson(json);
+    }
 }
+
 
 
