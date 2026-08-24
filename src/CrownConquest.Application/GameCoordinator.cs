@@ -58,6 +58,23 @@ public sealed class GameCoordinator : ICommandDispatcher
         return ticksExecuted;
     }
 
+    /// <summary>
+    /// Executes a single discrete simulation tick immediately on the underlying engine.
+    /// </summary>
+    public void Tick()
+    {
+        _simulation.Tick();
+    }
+
+    /// <summary>
+    /// Advances simulation by a specific number of fixed ticks.
+    /// </summary>
+    public void SimulateTicks(int count)
+    {
+        _simulation.SimulateTicks(count);
+    }
+
+
     public Result DispatchCommand(ICommand command)
     {
         ArgumentNullException.ThrowIfNull(command);

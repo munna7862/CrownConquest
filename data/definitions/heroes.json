@@ -1,0 +1,65 @@
+[
+  {
+    "id": "celtic_warlord",
+    "heroName": "Brennus",
+    "heroClass": "Warlord",
+    "faction": "celtic",
+    "baseStrength": 18,
+    "baseAgility": 12,
+    "baseWillpower": 10,
+    "strengthPerLevel": 3,
+    "agilityPerLevel": 1,
+    "willpowerPerLevel": 1,
+    "baseLeadershipCapacity": 15,
+    "abilityIds": [ "heroic_strike", "war_cry" ],
+    "aura": {
+      "auraName": "Warlord's Ferocity",
+      "radius": 12.0,
+      "damageMultiplierBonus": 0.15,
+      "armorBonus": 2.0,
+      "movementSpeedMultiplierBonus": 0.10
+    }
+  },
+  {
+    "id": "celtic_druid",
+    "heroName": "Diviciacus",
+    "heroClass": "Druid",
+    "faction": "celtic",
+    "baseStrength": 10,
+    "baseAgility": 10,
+    "baseWillpower": 20,
+    "strengthPerLevel": 1,
+    "agilityPerLevel": 1,
+    "willpowerPerLevel": 3,
+    "baseLeadershipCapacity": 12,
+    "abilityIds": [ "earth_mend", "roots_of_fury" ],
+    "aura": {
+      "auraName": "Nature's Harmony",
+      "radius": 14.0,
+      "damageMultiplierBonus": 0.10,
+      "armorBonus": 1.0,
+      "movementSpeedMultiplierBonus": 0.05
+    }
+  },
+  {
+    "id": "roman_centurion",
+    "heroName": "Marcus",
+    "heroClass": "Centurion",
+    "faction": "roman",
+    "baseStrength": 16,
+    "baseAgility": 14,
+    "baseWillpower": 12,
+    "strengthPerLevel": 2,
+    "agilityPerLevel": 2,
+    "willpowerPerLevel": 1,
+    "baseLeadershipCapacity": 18,
+    "abilityIds": [ "shield_bash", "pilum_volley" ],
+    "aura": {
+      "auraName": "Legion Discipline",
+      "radius": 12.0,
+      "damageMultiplierBonus": 0.12,
+      "armorBonus": 3.0,
+      "movementSpeedMultiplierBonus": 0.08
+    }
+  }
+]

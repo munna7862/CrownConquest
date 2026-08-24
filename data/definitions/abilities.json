@@ -1,0 +1,74 @@
+[
+  {
+    "id": "heroic_strike",
+    "displayName": "Heroic Strike",
+    "description": "Deals massive physical damage (50 base) to a single enemy in melee range.",
+    "manaCost": 25.0,
+    "cooldownTicks": 30,
+    "castRange": 2.5,
+    "radius": 0.0,
+    "targetType": "SingleTargetEnemy",
+    "effectType": "Damage",
+    "basePower": 50.0
+  },
+  {
+    "id": "war_cry",
+    "displayName": "War Cry",
+    "description": "Inspires allies and damages nearby enemies (30 base) within 8.0 tiles radius.",
+    "manaCost": 40.0,
+    "cooldownTicks": 50,
+    "castRange": 0.0,
+    "radius": 8.0,
+    "targetType": "PointAreaEnemy",
+    "effectType": "Damage",
+    "basePower": 30.0
+  },
+  {
+    "id": "earth_mend",
+    "displayName": "Earth Mend",
+    "description": "Heals all friendly units within 8.0 tiles radius for 60 health.",
+    "manaCost": 35.0,
+    "cooldownTicks": 40,
+    "castRange": 8.0,
+    "radius": 8.0,
+    "targetType": "PointAreaAlly",
+    "effectType": "Heal",
+    "basePower": 60.0
+  },
+  {
+    "id": "roots_of_fury",
+    "displayName": "Roots of Fury",
+    "description": "Entangles and damages enemies in target area for 40 damage.",
+    "manaCost": 45.0,
+    "cooldownTicks": 45,
+    "castRange": 10.0,
+    "radius": 6.0,
+    "targetType": "PointAreaEnemy",
+    "effectType": "Damage",
+    "basePower": 40.0
+  },
+  {
+    "id": "shield_bash",
+    "displayName": "Shield Bash",
+    "description": "Bashes target enemy for 35 damage in close combat.",
+    "manaCost": 20.0,
+    "cooldownTicks": 25,
+    "castRange": 2.0,
+    "radius": 0.0,
+    "targetType": "SingleTargetEnemy",
+    "effectType": "Damage",
+    "basePower": 35.0
+  },
+  {
+    "id": "pilum_volley",
+    "displayName": "Pilum Volley",
+    "description": "Hurls a volley of heavy javelins dealing 40 damage in an area up to 9.0 tiles away.",
+    "manaCost": 30.0,
+    "cooldownTicks": 35,
+    "castRange": 9.0,
+    "radius": 4.0,
+    "targetType": "PointAreaEnemy",
+    "effectType": "Damage",
+    "basePower": 40.0
+  }
+]

@@ -16,5 +16,23 @@
     "levelXpThresholds": [0, 120, 300, 550, 850, 1200, 1600, 2050, 2550, 3100],
     "healthPerLevelBonus": 20.0,
     "damagePerLevelBonus": 3.0
+  },
+  {
+    "id": "hero_warlord_curve",
+    "levelXpThresholds": [0, 150, 350, 650, 1050, 1550, 2150, 2850, 3650, 4550],
+    "healthPerLevelBonus": 35.0,
+    "damagePerLevelBonus": 4.5
+  },
+  {
+    "id": "hero_druid_curve",
+    "levelXpThresholds": [0, 140, 330, 620, 1000, 1480, 2060, 2740, 3520, 4400],
+    "healthPerLevelBonus": 25.0,
+    "damagePerLevelBonus": 3.0
+  },
+  {
+    "id": "hero_centurion_curve",
+    "levelXpThresholds": [0, 150, 350, 650, 1050, 1550, 2150, 2850, 3650, 4550],
+    "healthPerLevelBonus": 30.0,
+    "damagePerLevelBonus": 4.0
   }
 ]

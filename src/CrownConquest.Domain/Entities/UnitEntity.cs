@@ -38,22 +38,26 @@ public sealed class UnitEntity
     public bool IsWorker => WorkerState != null;
     public bool IsIdleWorker => IsWorker && State == UnitState.Idle && IsAlive;
 
+    public HeroState? HeroState { get; set; }
+    public bool IsHero => HeroState != null || Archetype == UnitArchetype.Hero;
+
     public float BaseMaxHealth { get; }
     public float HealthPerLevelBonus { get; }
-    public float MaxHealth => BaseMaxHealth + ((Veterancy.Level - 1) * HealthPerLevelBonus);
+    public float MaxHealth => BaseMaxHealth + ((Veterancy.Level - 1) * HealthPerLevelBonus) + (HeroState?.TotalAttributes.BonusHealth ?? 0f);
     public float CurrentHealth { get; private set; }
 
     public float BaseAttackDamage { get; }
     public float DamagePerLevelBonus { get; }
-    public float AttackDamage => BaseAttackDamage + ((Veterancy.Level - 1) * DamagePerLevelBonus);
+    public float AttackDamage => BaseAttackDamage + ((Veterancy.Level - 1) * DamagePerLevelBonus) + (HeroState?.TotalAttributes.BonusAttackDamage ?? 0f);
 
     public float BaseArmor { get; }
     public float ArmorPerLevelBonus { get; }
-    public float Armor => BaseArmor + ((Veterancy.Level - 1) * ArmorPerLevelBonus);
+    public float Armor => BaseArmor + ((Veterancy.Level - 1) * ArmorPerLevelBonus) + (HeroState?.TotalAttributes.BonusArmor ?? 0f);
 
     public float AttackRange { get; }
     public string AttackType { get; } // "melee" or "ranged"
-    public float MovementSpeed { get; }
+    public float BaseMovementSpeed { get; }
+    public float MovementSpeed => BaseMovementSpeed + (HeroState?.TotalAttributes.BonusMovementSpeed ?? 0f);
     public int AttackCooldownTicks { get; }
     public int CooldownRemaining { get; private set; }
     public int KillXpValue { get; }
@@ -82,15 +86,15 @@ public sealed class UnitEntity
         float armorPerLevelBonus = 1.0f,
         int[]? xpThresholds = null,
         WorkerGatherState? workerState = null,
-        UnitArchetype? archetype = null)
+        UnitArchetype? archetype = null,
+        HeroState? heroState = null)
     {
         Id = id;
         FactionId = factionId;
         UnitType = unitType;
-        Archetype = archetype ?? UnitArchetypeExtensions.FromUnitType(unitType);
+        Archetype = archetype ?? (heroState != null ? UnitArchetype.Hero : UnitArchetypeExtensions.FromUnitType(unitType));
         Position = position;
         BaseMaxHealth = maxHealth;
-        CurrentHealth = maxHealth;
         HealthPerLevelBonus = healthPerLevelBonus;
         BaseAttackDamage = attackDamage;
         DamagePerLevelBonus = damagePerLevelBonus;
@@ -98,7 +102,7 @@ public sealed class UnitEntity
         ArmorPerLevelBonus = armorPerLevelBonus;
         AttackRange = attackRange;
         AttackType = attackType;
-        MovementSpeed = movementSpeed;
+        BaseMovementSpeed = movementSpeed;
         AttackCooldownTicks = attackCooldownTicks;
         CooldownRemaining = 0;
         KillXpValue = killXpValue;
@@ -106,7 +110,10 @@ public sealed class UnitEntity
         State = UnitState.Idle;
         Veterancy = new VeterancyState(id, customThresholds: xpThresholds);
         WorkerState = workerState;
+        HeroState = heroState;
+        CurrentHealth = MaxHealth;
     }
+
 
     public void Move(Vector2D destination)
     {
@@ -236,9 +243,22 @@ public sealed class UnitEntity
 
     public void ApplyLevelUpBonus(float healthBonus)
     {
+        if (HeroState != null)
+        {
+            HeroState.OnLevelUp(Veterancy.Level);
+        }
+
         if (IsAlive && healthBonus > 0f)
         {
             CurrentHealth = MathF.Min(MaxHealth, CurrentHealth + healthBonus);
+        }
+    }
+
+    public void Heal(float amount)
+    {
+        if (IsAlive && amount > 0f)
+        {
+            CurrentHealth = MathF.Min(MaxHealth, CurrentHealth + amount);
         }
     }
 
@@ -252,6 +272,8 @@ public sealed class UnitEntity
 
     public void ResetCooldown()
     {
-        CooldownRemaining = AttackCooldownTicks;
+        int reduction = HeroState?.TotalAttributes.CooldownReductionTicks ?? 0;
+        CooldownRemaining = Math.Max(5, AttackCooldownTicks - reduction);
     }
 }
+
