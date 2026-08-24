@@ -8,6 +8,7 @@ using CrownConquest.Domain.Economy;
 using CrownConquest.Domain.Entities;
 using CrownConquest.Domain.Events;
 using CrownConquest.Domain.Logging;
+using CrownConquest.Domain.Profiling;
 
 namespace CrownConquest.Domain.Simulation;
 
@@ -27,6 +28,10 @@ public sealed class SimulationEngine
     private readonly List<EntityId> _queryBuffer = new(64);
     private readonly Dictionary<string, TechnologyDefinition> _techRegistry = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<AiFactionController> _aiControllers = new(4);
+    private readonly SimulationProfiler _profiler = new();
+    private readonly AiUpdateScheduler _aiScheduler = new();
+    private readonly PathfindingCache _pathfindingCache = new();
+    private readonly DomainEventRingBuffer _eventRingBuffer = new(512);
 
     public ulong CurrentTick => _state.CurrentTick;
     public SimulationConfig Config => _config;
@@ -38,6 +43,10 @@ public sealed class SimulationEngine
     public SpatialGrid SpatialGrid => _spatialGrid;
     public IReadOnlyDictionary<string, TechnologyDefinition> TechRegistry => _techRegistry;
     public IReadOnlyList<AiFactionController> AiControllers => _aiControllers;
+    public SimulationProfiler Profiler => _profiler;
+    public AiUpdateScheduler AiScheduler => _aiScheduler;
+    public PathfindingCache PathfindingCache => _pathfindingCache;
+    public DomainEventRingBuffer EventRingBuffer => _eventRingBuffer;
 
     public SimulationEngine(
         SimulationConfig? config = null,
@@ -165,50 +174,95 @@ public sealed class SimulationEngine
     /// </summary>
     public void Tick()
     {
+        _profiler.BeginTick();
         _state.CurrentTick++;
         ulong tick = _state.CurrentTick;
 
         // 1. Process staged commands deterministically
-        ProcessCommands(tick);
+        using (_profiler.Measure(SimulationPhase.Commands))
+        {
+            ProcessCommands(tick);
+        }
 
         // 1.5. Update autonomous AI controllers
-        UpdateAi(tick);
+        using (_profiler.Measure(SimulationPhase.Ai))
+        {
+            UpdateAi(tick);
+        }
 
         // 2. Update hero mana regen and ability cooldowns
-        UpdateHeroes(tick);
+        using (_profiler.Measure(SimulationPhase.Heroes))
+        {
+            UpdateHeroes(tick);
+        }
 
         // 3. Update worker gathering and construction state machine
-        UpdateWorkerTasks(tick);
+        using (_profiler.Measure(SimulationPhase.Workers))
+        {
+            UpdateWorkerTasks(tick);
+        }
 
         // 4. Auto-acquire targets for idle combat units in aggro range
-        UpdateTargetAcquisition();
+        using (_profiler.Measure(SimulationPhase.TargetAcquisition))
+        {
+            UpdateTargetAcquisition();
+        }
 
         // 5. Update unit movements and navigation with boundary clamping
-        UpdateMovements(tick);
+        using (_profiler.Measure(SimulationPhase.Movement))
+        {
+            UpdateMovements(tick);
+        }
 
         // 6. Update combat engagements & cooldowns
-        UpdateCombat(tick);
+        using (_profiler.Measure(SimulationPhase.Combat))
+        {
+            UpdateCombat(tick);
+        }
 
         // 6.5. Update defensive towers autonomous defense
-        UpdateTowers(tick);
+        using (_profiler.Measure(SimulationPhase.Towers))
+        {
+            UpdateTowers(tick);
+        }
 
         // 7. Update unit morale, hero auras, and routing state machines
-        UpdateMorale(tick);
+        using (_profiler.Measure(SimulationPhase.Morale))
+        {
+            UpdateMorale(tick);
+        }
 
         // 8. Update building production queues
-        UpdateProduction(tick);
+        using (_profiler.Measure(SimulationPhase.Production))
+        {
+            UpdateProduction(tick);
+        }
 
         // 9. Update building research queues
-        UpdateResearch(tick);
+        using (_profiler.Measure(SimulationPhase.Research))
+        {
+            UpdateResearch(tick);
+        }
 
         // 10. Update era advancement state machines
-        UpdateEraAdvancement(tick);
+        using (_profiler.Measure(SimulationPhase.EraAdvancement))
+        {
+            UpdateEraAdvancement(tick);
+        }
 
         // 11. Update population counts and capacities
-        UpdatePopulation(tick);
+        using (_profiler.Measure(SimulationPhase.Population))
+        {
+            UpdatePopulation(tick);
+        }
 
         // 12. Cleanup deceased entities and depleted nodes at tick boundary
-        CleanupEntities();
+        using (_profiler.Measure(SimulationPhase.Cleanup))
+        {
+            CleanupEntities();
+        }
+
+        _profiler.EndTick(tick, _state.ActiveUnits.Count, _state.ActiveBuildings.Count);
     }
 
     public void RegisterAiController(AiFactionController controller)
@@ -217,6 +271,7 @@ public sealed class SimulationEngine
         if (!_aiControllers.Contains(controller))
         {
             _aiControllers.Add(controller);
+            _aiScheduler.Register(controller);
         }
     }
 
@@ -229,13 +284,21 @@ public sealed class SimulationEngine
                 _aiControllers.RemoveAt(i);
             }
         }
+        _aiScheduler.Unregister(factionId);
     }
 
     private void UpdateAi(ulong tick)
     {
-        for (int i = 0; i < _aiControllers.Count; i++)
+        if (_aiScheduler.ScheduledFactionCount > 0)
         {
-            _aiControllers[i].Update(_state, _commandQueue, tick);
+            _aiScheduler.UpdateAll(_state, _commandQueue, tick);
+        }
+        else
+        {
+            for (int i = 0; i < _aiControllers.Count; i++)
+            {
+                _aiControllers[i].Update(_state, _commandQueue, tick);
+            }
         }
     }
 
@@ -1904,6 +1967,7 @@ public sealed class SimulationEngine
 
     private void UpdateTargetAcquisition()
     {
+        _profiler.RecordSpatialQuery();
         var units = _state.ActiveUnits;
         int count = units.Count;
 
@@ -1912,30 +1976,15 @@ public sealed class SimulationEngine
             var unit = units[i];
             if (!unit.IsAlive || unit.State != UnitState.Idle) continue;
 
-            _spatialGrid.QueryRadius(unit.Position, unit.AggroRange, id => _state.TryGetUnit(id, out var u) ? u?.Position : null, _queryBuffer);
+            var nearestEnemyId = _spatialGrid.QueryNearestEnemy(
+                unit.Position,
+                unit.AggroRange,
+                unit.FactionId,
+                id => _state.TryGetUnit(id, out var u) && u != null ? (u.Position, u.FactionId, u.IsAlive) : null);
 
-            UnitEntity? nearestEnemy = null;
-            float nearestDistSq = float.MaxValue;
-
-            for (int q = 0; q < _queryBuffer.Count; q++)
+            if (nearestEnemyId.HasValue)
             {
-                if (_state.TryGetUnit(_queryBuffer[q], out var candidate) && candidate != null && candidate.IsAlive)
-                {
-                    if (candidate.FactionId != unit.FactionId)
-                    {
-                        float distSq = unit.Position.DistanceSquaredTo(candidate.Position);
-                        if (distSq < nearestDistSq)
-                        {
-                            nearestDistSq = distSq;
-                            nearestEnemy = candidate;
-                        }
-                    }
-                }
-            }
-
-            if (nearestEnemy != null)
-            {
-                unit.Attack(nearestEnemy.Id);
+                unit.Attack(nearestEnemyId.Value);
             }
         }
     }

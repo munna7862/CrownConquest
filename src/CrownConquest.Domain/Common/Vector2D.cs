@@ -21,6 +21,8 @@ public readonly record struct Vector2D(float X, float Y)
 
     public static Vector2D operator -(Vector2D a) => new(-a.X, -a.Y);
 
+    public static float Dot(Vector2D a, Vector2D b) => (a.X * b.X) + (a.Y * b.Y);
+
     public static Vector2D operator *(Vector2D a, float scalar) => new(a.X * scalar, a.Y * scalar);
 
     public static Vector2D operator *(float scalar, Vector2D a) => new(a.X * scalar, a.Y * scalar);
