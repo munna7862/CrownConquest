@@ -70,7 +70,7 @@
 - [x] **Stage 8: DevOps & Release Engineer (DO) — Release, Branch & Pull Request**
   - [x] Execute `dotnet build` (0 warnings, 0 errors).
   - [x] Commit changes using conventional commit standards.
-  - [x] Push branch to remote and create Pull Request via `gh pr create`.
+  - [x] Push branch to remote and create Pull Request via `gh pr create` ([PR #13](https://github.com/munna7862/CrownConquest/pull/13)).
   - [x] Update documentation, PR artifact, and `walkthrough.md`.
   - [x] Conclude sprint execution.
 
