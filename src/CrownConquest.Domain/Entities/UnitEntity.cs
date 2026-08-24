@@ -15,6 +15,7 @@ public enum UnitState
     Returning,
     Constructing,
     Repairing,
+    Routed,
     Dead
 }
 
@@ -41,6 +42,18 @@ public sealed class UnitEntity
     public HeroState? HeroState { get; set; }
     public bool IsHero => HeroState != null || Archetype == UnitArchetype.Hero;
 
+    public FormationType Formation { get; set; } = FormationType.Line;
+    public FormationModifiers FormationModifiers => FormationModifiers.GetDefault(Formation);
+
+    public MoraleState Morale { get; }
+    public bool IsRouted => Morale.IsRouted || State == UnitState.Routed;
+
+    public ChargeState Charge { get; }
+    public TerrainType CurrentTerrain { get; set; } = TerrainType.Plains;
+    public TerrainModifiers TerrainModifiers => TerrainModifiers.GetDefault(CurrentTerrain);
+
+    public Vector2D HeadingDirection { get; set; } = new Vector2D(1f, 0f);
+
     public float BaseMaxHealth { get; }
     public float HealthPerLevelBonus { get; }
     public float MaxHealth => BaseMaxHealth + ((Veterancy.Level - 1) * HealthPerLevelBonus) + (HeroState?.TotalAttributes.BonusHealth ?? 0f);
@@ -52,12 +65,27 @@ public sealed class UnitEntity
 
     public float BaseArmor { get; }
     public float ArmorPerLevelBonus { get; }
-    public float Armor => BaseArmor + ((Veterancy.Level - 1) * ArmorPerLevelBonus) + (HeroState?.TotalAttributes.BonusArmor ?? 0f);
+    public float Armor => BaseArmor + ((Veterancy.Level - 1) * ArmorPerLevelBonus) + (HeroState?.TotalAttributes.BonusArmor ?? 0f) + FormationModifiers.ArmorBonus + CombatFormulas.GetMoraleArmorBonus(Morale.Level);
 
     public float AttackRange { get; }
     public string AttackType { get; } // "melee" or "ranged"
     public float BaseMovementSpeed { get; }
-    public float MovementSpeed => BaseMovementSpeed + (HeroState?.TotalAttributes.BonusMovementSpeed ?? 0f);
+
+    public float EffectiveMovementSpeed
+    {
+        get
+        {
+            float baseSpeed = BaseMovementSpeed + (HeroState?.TotalAttributes.BonusMovementSpeed ?? 0f);
+            float terrainMult = TerrainModifiers.MovementSpeedMultiplier;
+            float formationMult = FormationModifiers.MovementSpeedMultiplier;
+            float chargeMult = (Archetype == UnitArchetype.Cavalry && Charge.IsCharging) ? Charge.CurrentSpeedMultiplier * TerrainModifiers.ChargeSpeedMultiplier : 1.0f;
+            float routedMult = IsRouted ? 1.15f : 1.0f; // Panic sprint
+
+            return MathF.Max(0.5f, baseSpeed * terrainMult * formationMult * chargeMult * routedMult);
+        }
+    }
+
+    public float MovementSpeed => EffectiveMovementSpeed;
     public int AttackCooldownTicks { get; }
     public int CooldownRemaining { get; private set; }
     public int KillXpValue { get; }
@@ -87,7 +115,9 @@ public sealed class UnitEntity
         int[]? xpThresholds = null,
         WorkerGatherState? workerState = null,
         UnitArchetype? archetype = null,
-        HeroState? heroState = null)
+        HeroState? heroState = null,
+        float maxMorale = 100.0f,
+        FormationType formation = FormationType.Line)
     {
         Id = id;
         FactionId = factionId;
@@ -111,13 +141,15 @@ public sealed class UnitEntity
         Veterancy = new VeterancyState(id, customThresholds: xpThresholds);
         WorkerState = workerState;
         HeroState = heroState;
+        Morale = new MoraleState(maxMorale);
+        Charge = new ChargeState();
+        Formation = formation;
         CurrentHealth = MaxHealth;
     }
 
-
     public void Move(Vector2D destination)
     {
-        if (!IsAlive) return;
+        if (!IsAlive || IsRouted) return;
         MoveTarget = destination;
         AttackTargetId = EntityId.None;
         if (WorkerState != null)
@@ -129,7 +161,7 @@ public sealed class UnitEntity
 
     public void Attack(EntityId targetId)
     {
-        if (!IsAlive) return;
+        if (!IsAlive || IsRouted) return;
         AttackTargetId = targetId;
         MoveTarget = null;
         if (WorkerState != null)
@@ -141,7 +173,7 @@ public sealed class UnitEntity
 
     public void AssignGather(EntityId resourceNodeId)
     {
-        if (!IsAlive || WorkerState == null) return;
+        if (!IsAlive || IsRouted || WorkerState == null) return;
         WorkerState.TargetResourceNodeId = resourceNodeId;
         WorkerState.TaskState = WorkerTaskState.MovingToResource;
         AttackTargetId = EntityId.None;
@@ -150,7 +182,7 @@ public sealed class UnitEntity
 
     public void AssignConstruct(EntityId buildingId)
     {
-        if (!IsAlive || WorkerState == null) return;
+        if (!IsAlive || IsRouted || WorkerState == null) return;
         WorkerState.TargetBuildingId = buildingId;
         WorkerState.TaskState = WorkerTaskState.MovingToConstruct;
         AttackTargetId = EntityId.None;
@@ -159,7 +191,7 @@ public sealed class UnitEntity
 
     public void AssignRepair(EntityId buildingId)
     {
-        if (!IsAlive || WorkerState == null) return;
+        if (!IsAlive || IsRouted || WorkerState == null) return;
         WorkerState.TargetBuildingId = buildingId;
         WorkerState.TaskState = WorkerTaskState.MovingToRepair;
         AttackTargetId = EntityId.None;
@@ -168,8 +200,10 @@ public sealed class UnitEntity
 
     public void Stop()
     {
+        if (IsRouted) return;
         MoveTarget = null;
         AttackTargetId = EntityId.None;
+        Charge.Reset();
         if (WorkerState != null)
         {
             WorkerState.ResetTask();
@@ -177,6 +211,36 @@ public sealed class UnitEntity
         if (IsAlive)
         {
             State = UnitState.Idle;
+        }
+    }
+
+    public void SetFormation(FormationType newFormation)
+    {
+        if (!IsAlive || IsRouted) return;
+        Formation = newFormation;
+    }
+
+    public void Route(Vector2D safeDestination)
+    {
+        if (!IsAlive) return;
+        State = UnitState.Routed;
+        MoveTarget = safeDestination;
+        AttackTargetId = EntityId.None;
+        Charge.Reset();
+        if (WorkerState != null)
+        {
+            WorkerState.ResetTask();
+        }
+    }
+
+    public void Rally(float recoveryAmount = 25.0f)
+    {
+        if (!IsAlive) return;
+        Morale.Rally(recoveryAmount);
+        if (Morale.CurrentMorale >= 25.0f && State == UnitState.Routed)
+        {
+            State = UnitState.Idle;
+            MoveTarget = null;
         }
     }
 
@@ -203,6 +267,44 @@ public sealed class UnitEntity
         ApplyCalculatedDamage(calculatedEffectiveDamage, attackerId, attackerFaction, tick, eventBus, out killed);
     }
 
+    public void TakeRecoilDamage(
+        float recoilDamage,
+        EntityId bracedTargetId,
+        ulong tick,
+        DomainEventBus eventBus,
+        out bool killed)
+    {
+        killed = false;
+        if (!IsAlive || recoilDamage <= 0f) return;
+
+        CurrentHealth = MathF.Max(0f, CurrentHealth - recoilDamage);
+        Charge.Discharge();
+
+        eventBus.Publish(new DamageDealtEvent(
+            tick,
+            bracedTargetId,
+            Id,
+            recoilDamage,
+            CurrentHealth,
+            IsCritical: false));
+
+        if (CurrentHealth <= 0f)
+        {
+            State = UnitState.Dead;
+            MoveTarget = null;
+            AttackTargetId = EntityId.None;
+            killed = true;
+
+            eventBus.Publish(new UnitKilledEvent(
+                tick,
+                Id,
+                bracedTargetId,
+                FactionId,
+                FactionId.Neutral,
+                Position));
+        }
+    }
+
     private void ApplyCalculatedDamage(
         float effectiveDamage,
         EntityId attackerId,
@@ -215,6 +317,9 @@ public sealed class UnitEntity
         if (!IsAlive) return;
 
         CurrentHealth = MathF.Max(0f, CurrentHealth - effectiveDamage);
+
+        // Apply minor morale hit on taking damage (-2)
+        Morale.ApplyShock(2.0f);
 
         eventBus.Publish(new DamageDealtEvent(
             tick,
@@ -229,6 +334,7 @@ public sealed class UnitEntity
             State = UnitState.Dead;
             MoveTarget = null;
             AttackTargetId = EntityId.None;
+            Charge.Reset();
             killed = true;
 
             eventBus.Publish(new UnitKilledEvent(
@@ -276,4 +382,3 @@ public sealed class UnitEntity
         CooldownRemaining = Math.Max(5, AttackCooldownTicks - reduction);
     }
 }
-

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "plains",
+    "name": "Plains",
+    "movementSpeedMultiplier": 1.0,
+    "elevationLevel": 0,
+    "rangedCoverMitigation": 0.0,
+    "chargeSpeedMultiplier": 1.0,
+    "description": "Open rolling plains providing standard movement and unhindered combat."
+  },
+  {
+    "id": "forest",
+    "name": "Forest",
+    "movementSpeedMultiplier": 0.8,
+    "elevationLevel": 0,
+    "rangedCoverMitigation": 0.35,
+    "chargeSpeedMultiplier": 0.6,
+    "description": "Dense foliage reducing movement speed and mitigating 35% of incoming ranged damage."
+  },
+  {
+    "id": "hills",
+    "name": "Hills",
+    "movementSpeedMultiplier": 0.85,
+    "elevationLevel": 1,
+    "rangedCoverMitigation": 0.15,
+    "chargeSpeedMultiplier": 0.8,
+    "description": "High ground offering +2.0 attack range and +25% damage bonus against lower elevation targets."
+  },
+  {
+    "id": "marsh",
+    "name": "Marsh",
+    "movementSpeedMultiplier": 0.6,
+    "elevationLevel": -1,
+    "rangedCoverMitigation": 0.0,
+    "chargeSpeedMultiplier": 0.4,
+    "description": "Waterlogged terrain causing severe movement penalties and disabling charge momentum."
+  },
+  {
+    "id": "road",
+    "name": "Road",
+    "movementSpeedMultiplier": 1.25,
+    "elevationLevel": 0,
+    "rangedCoverMitigation": 0.0,
+    "chargeSpeedMultiplier": 1.1,
+    "description": "Paved military road granting 25% movement speed bonus."
+  },
+  {
+    "id": "water",
+    "name": "Water",
+    "movementSpeedMultiplier": 0.0,
+    "elevationLevel": 0,
+    "rangedCoverMitigation": 0.0,
+    "chargeSpeedMultiplier": 0.0,
+    "description": "Impassable water body blocking all ground unit transit."
+  }
+]

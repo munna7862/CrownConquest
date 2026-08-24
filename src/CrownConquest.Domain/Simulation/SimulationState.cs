@@ -27,6 +27,7 @@ public sealed class SimulationState
     private readonly Dictionary<FactionId, FactionTechManager> _techManagers = new(8);
 
     public PlacementGrid PlacementGrid { get; } = new(cellSize: 1.0f);
+    public Combat.TerrainGrid TerrainGrid { get; } = new(64, 64, 1.0f);
 
     public ulong CurrentTick { get; internal set; }
     public IReadOnlyDictionary<EntityId, UnitEntity> Units => _units;
@@ -176,6 +177,11 @@ public sealed class SimulationState
             hash = (hash ^ (ulong)BitConverter.SingleToInt32Bits(unit.CurrentHealth)) * 1099511628211UL;
             hash = (hash ^ (ulong)unit.Veterancy.Level) * 1099511628211UL;
             hash = (hash ^ (ulong)unit.Veterancy.CurrentXp) * 1099511628211UL;
+            hash = (hash ^ (ulong)unit.Formation) * 1099511628211UL;
+            hash = (hash ^ (ulong)BitConverter.SingleToInt32Bits(unit.Morale.CurrentMorale)) * 1099511628211UL;
+            hash = (hash ^ (ulong)unit.Charge.MomentumTicks) * 1099511628211UL;
+            hash = (hash ^ (ulong)unit.CurrentTerrain) * 1099511628211UL;
+
             if (unit.WorkerState != null)
             {
                 hash = (hash ^ (ulong)unit.WorkerState.CarriedAmount) * 1099511628211UL;

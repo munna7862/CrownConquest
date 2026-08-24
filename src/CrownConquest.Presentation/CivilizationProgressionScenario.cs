@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CrownConquest.Application;
+using CrownConquest.Domain.Combat;
 using CrownConquest.Domain.Commands;
 using CrownConquest.Domain.Common;
 using CrownConquest.Domain.Economy;
@@ -219,27 +220,21 @@ public sealed class CivilizationProgressionScenario
 
         sim.SimulateTicks(250); // Production completes for all buildings
 
-        // Phase 5: Order Player Army and Enemy Army to engage
-        var playerMilitary = new List<UnitEntity>();
+        // Phase 5: Assemble Player Army into Tactical Formation at forward rally point
+        var stagingPoint = new Vector2D(65f, 48f);
         foreach (var u in sim.State.ActiveUnits)
         {
             if (u.FactionId == PlayerFaction && u.Archetype != UnitArchetype.Worker && u.IsAlive)
             {
-                playerMilitary.Add(u);
+                u.Move(stagingPoint);
+                if (u.Archetype == UnitArchetype.Spearman) u.SetFormation(FormationType.ShieldWall);
+                else if (u.Archetype == UnitArchetype.Cavalry) u.SetFormation(FormationType.Wedge);
             }
         }
-
-        var enemyMilitary = new List<UnitEntity>();
-        foreach (var u in sim.State.ActiveUnits)
-        {
-            if (u.FactionId == EnemyFaction && u.IsAlive)
-            {
-                enemyMilitary.Add(u);
-            }
-        }
+        sim.SimulateTicks(160); // Advance until full army reaches forward staging area
 
         // Phase 6: Run Combat until victory with battlefield target re-acquisition
-        for (int step = 0; step < 40; step++)
+        for (int step = 0; step < 80; step++)
         {
             var livingEnemies = new List<UnitEntity>();
             foreach (var u in sim.State.ActiveUnits)
@@ -254,22 +249,25 @@ public sealed class CivilizationProgressionScenario
 
             foreach (var u in sim.State.ActiveUnits)
             {
-                if (u.FactionId == PlayerFaction && u.Archetype != UnitArchetype.Worker && u.IsAlive && u.State == UnitState.Idle)
+                if (u.FactionId == PlayerFaction && u.Archetype != UnitArchetype.Worker && u.IsAlive)
                 {
-                    UnitEntity? nearest = null;
-                    float minDist = float.MaxValue;
-                    for (int e = 0; e < livingEnemies.Count; e++)
+                    if (u.State != UnitState.Attacking || !u.AttackTargetId.IsValid || !sim.State.TryGetUnit(u.AttackTargetId, out var curTarget) || curTarget == null || !curTarget.IsAlive)
                     {
-                        float dist = u.Position.DistanceTo(livingEnemies[e].Position);
-                        if (dist < minDist)
+                        UnitEntity? nearest = null;
+                        float minDist = float.MaxValue;
+                        for (int e = 0; e < livingEnemies.Count; e++)
                         {
-                            minDist = dist;
-                            nearest = livingEnemies[e];
+                            float dist = u.Position.DistanceTo(livingEnemies[e].Position);
+                            if (dist < minDist)
+                            {
+                                minDist = dist;
+                                nearest = livingEnemies[e];
+                            }
                         }
-                    }
-                    if (nearest != null)
-                    {
-                        u.Attack(nearest.Id);
+                        if (nearest != null)
+                        {
+                            u.Attack(nearest.Id);
+                        }
                     }
                 }
             }

@@ -183,19 +183,22 @@ public sealed class SimulationEngine
         // 6. Update combat engagements & cooldowns
         UpdateCombat(tick);
 
-        // 7. Update building production queues
+        // 7. Update unit morale, hero auras, and routing state machines
+        UpdateMorale(tick);
+
+        // 8. Update building production queues
         UpdateProduction(tick);
 
-        // 8. Update building research queues
+        // 9. Update building research queues
         UpdateResearch(tick);
 
-        // 9. Update era advancement state machines
+        // 10. Update era advancement state machines
         UpdateEraAdvancement(tick);
 
-        // 10. Update population counts and capacities
+        // 11. Update population counts and capacities
         UpdatePopulation(tick);
 
-        // 11. Cleanup deceased entities and depleted nodes at tick boundary
+        // 12. Cleanup deceased entities and depleted nodes at tick boundary
         CleanupEntities();
     }
 
@@ -223,6 +226,54 @@ public sealed class SimulationEngine
     {
         switch (command)
         {
+            case SetFormationCommand setForm:
+            {
+                if (_state.TryGetUnit(setForm.UnitId, out var unit) && unit != null && unit.IsAlive)
+                {
+                    unit.SetFormation(setForm.Formation);
+                    _eventBus.Publish(new UnitFormationChangedEvent(tick, unit.Id, setForm.Formation));
+                }
+                break;
+            }
+
+            case SetSquadFormationCommand squadForm:
+            {
+                for (int i = 0; i < squadForm.UnitIds.Count; i++)
+                {
+                    if (_state.TryGetUnit(squadForm.UnitIds[i], out var unit) && unit != null && unit.IsAlive)
+                    {
+                        unit.SetFormation(squadForm.Formation);
+                        _eventBus.Publish(new UnitFormationChangedEvent(tick, unit.Id, squadForm.Formation));
+                    }
+                }
+                break;
+            }
+
+            case RallyUnitCommand rally:
+            {
+                if (_state.TryGetUnit(rally.UnitId, out var unit) && unit != null && unit.IsAlive)
+                {
+                    unit.Rally(25.0f);
+                    _eventBus.Publish(new UnitRalliedEvent(tick, unit.Id, unit.FactionId, unit.Morale.CurrentMorale));
+                }
+                break;
+            }
+
+            case RallySquadCommand squadRally:
+            {
+                var activeUnits = _state.ActiveUnits;
+                for (int i = 0; i < activeUnits.Count; i++)
+                {
+                    var unit = activeUnits[i];
+                    if (unit.FactionId == squadRally.FactionId && unit.IsAlive && unit.Position.DistanceTo(squadRally.Center) <= squadRally.Radius)
+                    {
+                        unit.Rally(25.0f);
+                        _eventBus.Publish(new UnitRalliedEvent(tick, unit.Id, unit.FactionId, unit.Morale.CurrentMorale));
+                    }
+                }
+                break;
+            }
+
             case AttachToHeroCommand attachHero:
             {
                 ExecuteAttachToHero(attachHero, tick);
@@ -1737,13 +1788,30 @@ public sealed class SimulationEngine
             var unit = units[i];
             if (!unit.IsAlive) continue;
 
-            if (unit.State == UnitState.Moving && unit.MoveTarget.HasValue)
+            unit.CurrentTerrain = _state.TerrainGrid.GetTerrainAt(unit.Position);
+
+            if ((unit.State == UnitState.Moving || unit.State == UnitState.Routed) && unit.MoveTarget.HasValue)
             {
                 var prevPos = unit.Position;
                 var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
                 float effectiveSpeed = unit.MovementSpeed + (unit.Archetype == UnitArchetype.Cavalry ? tech.CavalrySpeedBonus : 0f);
                 float maxDistance = effectiveSpeed * dt;
                 var target = _bounds.Clamp(unit.MoveTarget.Value);
+                var dir = target - unit.Position;
+                if (dir.LengthSquared > 0.01f)
+                {
+                    unit.HeadingDirection = dir.Normalized();
+                }
+
+                if (unit.Archetype == UnitArchetype.Cavalry && unit.State == UnitState.Moving)
+                {
+                    unit.Charge.IncrementMomentum();
+                }
+                else if (unit.State != UnitState.Moving)
+                {
+                    unit.Charge.Reset();
+                }
+
                 var nextPos = unit.Position.MoveTowards(target, maxDistance);
                 nextPos = _bounds.Clamp(nextPos);
 
@@ -1754,10 +1822,18 @@ public sealed class SimulationEngine
                 {
                     unit.Position = target;
                     unit.MoveTarget = null;
-                    unit.State = UnitState.Idle;
+                    if (unit.State == UnitState.Moving)
+                    {
+                        unit.State = UnitState.Idle;
+                    }
+                    unit.Charge.Reset();
                 }
 
                 _eventBus.Publish(new UnitMovedEvent(tick, unit.Id, prevPos, unit.Position));
+            }
+            else if (unit.State == UnitState.Idle)
+            {
+                unit.Charge.Reset();
             }
         }
     }
@@ -1771,7 +1847,7 @@ public sealed class SimulationEngine
         for (int i = 0; i < count; i++)
         {
             var unit = units[i];
-            if (!unit.IsAlive) continue;
+            if (!unit.IsAlive || unit.IsRouted) continue;
 
             unit.DecrementCooldown();
 
@@ -1781,6 +1857,7 @@ public sealed class SimulationEngine
                 {
                     unit.AttackTargetId = EntityId.None;
                     unit.State = UnitState.Idle;
+                    unit.Charge.Reset();
                     continue;
                 }
 
@@ -1788,14 +1865,26 @@ public sealed class SimulationEngine
                 var targetTech = _state.GetOrCreateTechManager(target.FactionId).Modifiers;
 
                 float rangeBonus = unit.Archetype == UnitArchetype.Archer ? attackerTech.RangedRangeBonus : 0f;
-                float effectiveRange = unit.AttackRange + rangeBonus;
+                int attackerElevation = unit.TerrainModifiers.ElevationLevel;
+                int targetElevation = target.TerrainModifiers.ElevationLevel;
 
-                if (!CombatFormulas.IsInRange(unit.Position, target.Position, effectiveRange))
+                if (!CombatFormulas.IsInRange(unit.Position, target.Position, unit.AttackRange, rangeBonus, attackerElevation, targetElevation))
                 {
                     var tech = _state.GetOrCreateTechManager(unit.FactionId).Modifiers;
                     float effectiveSpeed = unit.MovementSpeed + (unit.Archetype == UnitArchetype.Cavalry ? tech.CavalrySpeedBonus : 0f);
                     float maxDistance = effectiveSpeed * dt;
                     var prevPos = unit.Position;
+                    var dir = target.Position - unit.Position;
+                    if (dir.LengthSquared > 0.01f)
+                    {
+                        unit.HeadingDirection = dir.Normalized();
+                    }
+
+                    if (unit.Archetype == UnitArchetype.Cavalry)
+                    {
+                        unit.Charge.IncrementMomentum();
+                    }
+
                     var nextPos = unit.Position.MoveTowards(target.Position, maxDistance);
                     nextPos = _bounds.Clamp(nextPos);
 
@@ -1810,20 +1899,61 @@ public sealed class SimulationEngine
                     GetUnitAuraModifiers(unit, out float attackerAuraDmg, out _, out _);
                     GetUnitAuraModifiers(target, out _, out float targetAuraArmor, out _);
 
-                    float calculatedDamage = CombatFormulas.CalculateCombatDamageWithAura(
+                    bool isCharging = unit.Archetype == UnitArchetype.Cavalry && unit.Charge.IsCharging;
+                    bool isRanged = unit.AttackType.Equals("ranged", StringComparison.OrdinalIgnoreCase) || unit.Archetype == UnitArchetype.Archer;
+
+                    bool isFlanking = CombatFormulas.IsFlankingAttack(unit.Position, target.Position, target.HeadingDirection);
+                    if (isFlanking && target.Formation != FormationType.Square)
+                    {
+                        target.Morale.ApplyShock(15.0f);
+                    }
+
+                    var (calculatedDamage, chargeBlocked, recoilDamage) = CombatFormulas.CalculateTacticalCombatDamage(
                         unit.Archetype,
                         unit.AttackDamage,
                         attackerTech,
                         attackerAuraDmg,
+                        unit.FormationModifiers,
+                        unit.Morale.Level,
+                        unit.TerrainModifiers,
+                        isCharging,
+                        isRanged,
                         target.Archetype,
                         target.Armor,
                         targetTech,
-                        targetAuraArmor);
+                        targetAuraArmor,
+                        target.FormationModifiers,
+                        target.Morale.Level,
+                        target.TerrainModifiers);
+
+                    if (isCharging)
+                    {
+                        unit.Charge.Discharge();
+                        _eventBus.Publish(new CavalryChargeImpactEvent(
+                            tick,
+                            unit.Id,
+                            target.Id,
+                            calculatedDamage,
+                            chargeBlocked,
+                            recoilDamage));
+
+                        if (!chargeBlocked)
+                        {
+                            target.Morale.ApplyShock(ChargeState.ChargeMoraleShock);
+                        }
+
+                        if (chargeBlocked && recoilDamage > 0f)
+                        {
+                            unit.TakeRecoilDamage(recoilDamage, target.Id, tick, _eventBus, out _);
+                        }
+                    }
 
                     target.TakeCombatDamage(calculatedDamage, unit.Id, unit.FactionId, tick, _eventBus, out bool killed);
 
                     if (killed)
                     {
+                        ApplyNearbyCasualtyMoraleShock(target, tick);
+
                         if (unit.IsAlive && unit.FactionId != target.FactionId)
                         {
                             unit.Veterancy.RecordKill();
@@ -1878,6 +2008,107 @@ public sealed class SimulationEngine
                 }
             }
         }
+    }
+
+    private void UpdateMorale(ulong tick)
+    {
+        var units = _state.ActiveUnits;
+        int count = units.Count;
+
+        for (int i = 0; i < count; i++)
+        {
+            var unit = units[i];
+            if (!unit.IsAlive) continue;
+
+            unit.CurrentTerrain = _state.TerrainGrid.GetTerrainAt(unit.Position);
+
+            // 1. Routing evaluation
+            if (unit.Morale.IsRouted && unit.State != UnitState.Routed)
+            {
+                Vector2D retreatTarget = FindSafeRetreatPoint(unit);
+                unit.Route(retreatTarget);
+                _eventBus.Publish(new UnitRoutedEvent(tick, unit.Id, unit.FactionId, unit.Position));
+            }
+            else if (unit.State == UnitState.Routed && unit.Morale.CurrentMorale >= 25.0f)
+            {
+                unit.Rally(0f); // Resets state to Idle if >= 25.0
+                _eventBus.Publish(new UnitRalliedEvent(tick, unit.Id, unit.FactionId, unit.Morale.CurrentMorale));
+            }
+
+            // 2. Passive recovery when out of active combat engagement and not routed
+            if (!unit.Morale.IsRouted && unit.State != UnitState.Attacking && unit.CooldownRemaining == 0)
+            {
+                unit.Morale.Recover(0.05f); // +1.0 per second at 20 ticks/sec
+            }
+
+            // 3. Hero Leadership Aura recovery (+0.15/tick -> +3.0/sec)
+            bool nearHero = false;
+            for (int h = 0; h < count; h++)
+            {
+                var hero = units[h];
+                if (hero.FactionId == unit.FactionId && hero.IsHero && hero.IsAlive && hero.HeroState != null)
+                {
+                    float radius = hero.HeroState.ActiveAura?.Radius ?? 10.0f;
+                    if (hero.HeroState.AttachedUnitIds.Contains(unit.Id) || hero.Position.DistanceSquaredTo(unit.Position) <= (radius * radius))
+                    {
+                        nearHero = true;
+                        break;
+                    }
+                }
+            }
+
+            if (nearHero)
+            {
+                unit.Morale.Recover(0.15f);
+            }
+        }
+    }
+
+    private void ApplyNearbyCasualtyMoraleShock(UnitEntity casualty, ulong tick)
+    {
+        var units = _state.ActiveUnits;
+        int count = units.Count;
+
+        float casualtyRadiusSq = 8.0f * 8.0f;
+        float heroCasualtyRadiusSq = 15.0f * 15.0f;
+
+        for (int i = 0; i < count; i++)
+        {
+            var friendly = units[i];
+            if (friendly.FactionId == casualty.FactionId && friendly.IsAlive && friendly.Id != casualty.Id)
+            {
+                float distSq = friendly.Position.DistanceSquaredTo(casualty.Position);
+                if (distSq <= casualtyRadiusSq)
+                {
+                    friendly.Morale.ApplyShock(10.0f);
+                }
+
+                if (casualty.IsHero && distSq <= heroCasualtyRadiusSq)
+                {
+                    friendly.Morale.ApplyShock(30.0f);
+                }
+            }
+        }
+    }
+
+    private Vector2D FindSafeRetreatPoint(UnitEntity unit)
+    {
+        var buildings = _state.ActiveBuildings;
+        for (int b = 0; b < buildings.Count; b++)
+        {
+            var building = buildings[b];
+            if (building.FactionId == unit.FactionId && building.IsAlive && building.BuildingType.Equals("town_center", StringComparison.OrdinalIgnoreCase))
+            {
+                return building.Position;
+            }
+        }
+
+        if (unit.FactionId.Value == 2)
+        {
+            return new Vector2D(80.0f, 50.0f);
+        }
+
+        return new Vector2D(-25.0f, -25.0f);
     }
 
     private void CleanupEntities()
