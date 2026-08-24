@@ -7,6 +7,7 @@
 - **Branch:** `feature/sprint-08-ai-foundation`
 - **Cumulative Tests:** 174 Tests (156 Historical + 18 Sprint 08)
 - **Status:** COMPLETED & APPROVED
+- **Pull Request:** [#9](https://github.com/munna7862/CrownConquest/pull/9)
 
 ---
 
