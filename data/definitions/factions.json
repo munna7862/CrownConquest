@@ -1,0 +1,52 @@
+[
+  {
+    "id": "faction_valoria",
+    "name": "Kingdom of Valoria",
+    "culture": "Feudal Knights",
+    "homeProvinceId": "prov_capital_valoria",
+    "initialReputation": 75,
+    "colorHex": "#3B82F6",
+    "tradeModifier": 1.25,
+    "description": "Noble kingdom of chivalry and fortified strongholds, loyal allies of the crown."
+  },
+  {
+    "id": "faction_nordheim",
+    "name": "Nordheim Clans",
+    "culture": "Highland Warriors",
+    "homeProvinceId": "prov_frost_peak",
+    "initialReputation": 10,
+    "colorHex": "#10B981",
+    "tradeModifier": 1.0,
+    "description": "Fierce northern highland clans with pragmatic loyalty and strong infantry."
+  },
+  {
+    "id": "faction_ironfist",
+    "name": "Ironfist Syndicate",
+    "culture": "Mercenary Raiders",
+    "homeProvinceId": "prov_black_ridge",
+    "initialReputation": -70,
+    "colorHex": "#EF4444",
+    "tradeModifier": 0.0,
+    "description": "Ruthless raiders and siege engineers constantly seeking to expand through iron and blood."
+  },
+  {
+    "id": "faction_wildborne",
+    "name": "Wildborne Nomads",
+    "culture": "Forest Rangers",
+    "homeProvinceId": "prov_whispering_woods",
+    "initialReputation": -30,
+    "colorHex": "#F59E0B",
+    "tradeModifier": 0.85,
+    "description": "Territorial forest skirmishers who attack trespassers on ancient sacred lands."
+  },
+  {
+    "id": "faction_al_rashid",
+    "name": "Emirate of Al-Rashid",
+    "culture": "Desert Merchants",
+    "homeProvinceId": "prov_golden_sands",
+    "initialReputation": 40,
+    "colorHex": "#8B5CF6",
+    "tradeModifier": 1.35,
+    "description": "Wealthy desert trading empire with advanced alchemy and trade caravans."
+  }
+]

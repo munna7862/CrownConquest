@@ -19,6 +19,8 @@ public sealed class CampaignEngine
     public StrategicMap Map { get; }
     public StrategicTerritoryManager TerritoryManager { get; }
     public DomainEventBus EventBus { get; }
+    public FactionDiplomacyManager Diplomacy { get; }
+    public MissionEngine Missions { get; }
 
     public int SimulationTick { get; private set; }
     public int CampaignTurn { get; private set; } = 1;
@@ -30,11 +32,15 @@ public sealed class CampaignEngine
     public CampaignEngine(
         StrategicMap map,
         DomainEventBus? eventBus = null,
+        FactionDiplomacyManager? diplomacy = null,
+        MissionEngine? missions = null,
         int ticksPerTurn = 100)
     {
         Map = map;
         TerritoryManager = new StrategicTerritoryManager(map);
         EventBus = eventBus ?? new DomainEventBus();
+        Diplomacy = diplomacy ?? new FactionDiplomacyManager(EventBus);
+        Missions = missions ?? new MissionEngine();
         TicksPerTurn = Math.Max(10, ticksPerTurn);
     }
 
@@ -188,6 +194,7 @@ public sealed class CampaignEngine
                     }
 
                     EventBus.Publish(new ArmyArrivedAtProvinceEvent((ulong)SimulationTick, army.Id, arrivedProvinceId));
+                    Missions.ReportConvoyArrival(army.Id, arrivedProvinceId, SimulationTick, EventBus);
 
                     // Check for hostile engagement in province
                     bool engagementTriggered = CheckAndResolveEngagement(army, arrivedProvinceId);
@@ -204,6 +211,9 @@ public sealed class CampaignEngine
                 }
             }
         }
+
+        // Evaluate active campaign missions
+        Missions.EvaluateMissions(SimulationTick, this, Diplomacy, EventBus);
 
         // Check for turn boundary
         if (SimulationTick % TicksPerTurn == 0)
@@ -255,6 +265,10 @@ public sealed class CampaignEngine
                 EventBus.Publish(new ProvinceCapturedEvent((ulong)SimulationTick, provinceId, province.OwnerFaction, army.FactionId));
             }
 
+            // Report casualties to MissionEngine
+            string targetFactionName = enemyArmy != null ? enemyArmy.FactionId.Value.ToString() : "faction_ironfist";
+            Missions.ReportCasualties(targetFactionName, provinceId, result.DefenderCasualties, SimulationTick, EventBus);
+
             // Cleanup destroyed armies
             if (!army.HasUnits)
             {
@@ -278,6 +292,8 @@ public sealed class CampaignEngine
     {
         if (_armies.TryGetValue(armyId, out var army) && army != null)
         {
+            Missions.ReportConvoyDestruction(armyId, SimulationTick, EventBus);
+
             if (Map.TryGetProvince(army.CurrentProvinceId, out var prov) && prov != null)
             {
                 prov.StationedArmyIds.Remove(armyId);
