@@ -8,6 +8,8 @@ public readonly record struct FactionId(int Value) : IComparable<FactionId>
     public static readonly FactionId Neutral = new(0);
     public static readonly FactionId Player1 = new(1);
     public static readonly FactionId Player2 = new(2);
+    public static readonly FactionId Player = Player1;
+    public static readonly FactionId Enemy = Player2;
 
     public bool IsValid => Value >= 0;
 

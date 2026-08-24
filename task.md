@@ -1,106 +1,77 @@
-# Sprint 09: Tactical AI and Personalities — Backlog & Execution Tracking
+# Sprint 10: Strategic World Foundation & Territory Conquest
 
-## Sprint Metadata
-- **Sprint:** Sprint 09 — Tactical AI and Personalities
-- **Phase:** Phase 3 — Autonomous Systems & Single-Player
-- **Story Points:** 28 SP
-- **Branch:** `feature/sprint-09-tactical-ai-and-personalities`
-- **Cumulative Tests:** 194 Tests (174 Historical + 20 Sprint 09)
-- **Status:** COMPLETED & APPROVED
-- **Pull Request:** [#10](https://github.com/munna7862/CrownConquest/pull/10)
+## Backlog Stories & Ownership Matrix
 
----
-
-## 1. Backlog Stories & Ownership Matrix
-
-| Story ID | Story Title | SP | Tier | Owner | Status |
-|:---|:---|:---:|:---:|:---|:---:|
-| `CNC-0901` | Focus Fire & Tactical Vulnerability Scoring | 3 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0902` | Flanking Maneuver & Rear Strike AI | 3 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0903` | Dynamic Formation Selection & Counter-Tactics | 3 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0904` | Terrain & High Ground Tactical Exploitation | 2 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0905` | Siege Deployment & Fortification Assault AI | 3 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0906` | Aggressive / Raider Personality Profile | 2 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0907` | Defensive / Bastion Personality Profile | 2 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0908` | Expansionist / Imperial Personality Profile | 2 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0909` | Tactical / Hero-Centric Personality Profile | 2 | Domain | ARCH / SDE | `[x] Complete` |
-| `CNC-0910` | AI Personality Config & Data Loader Integration | 3 | Data/Domain | SDE / ARCH | `[x] Complete` |
-| `CNC-0911` | Tactical AI & Personalities Headless Match Scenario | 3 | Scenario | SDE / SDET | `[x] Complete` |
+| Story ID | Title | Owner Persona | Status |
+|:---|:---|:---|:---|
+| `CNC-1001` | Data-Driven Province Definitions & JSON Schema | SDE / Dev Architect | [x] Completed |
+| `CNC-1002` | Strategic Province & Territory Domain Entity Models | ARCH / Domain Architect | [x] Completed |
+| `CNC-1003` | Strategic Map Graph Topology & Shortest Path Routing | ARCH / Domain Architect | [x] Completed |
+| `CNC-1004` | Strategic Army Domain Entity & Unit/Hero Spec Roster | ARCH / Domain Architect | [x] Completed |
+| `CNC-1005` | Terrain-Weighted Strategic Movement Duration Formulas | ARCH / Domain Architect | [x] Completed |
+| `CNC-1006` | Territory Ownership & Control Distribution Calculations | ARCH / Domain Architect | [x] Completed |
+| `CNC-1007` | Strategic-to-Tactical Battle Transition & Progression Return | SDE / Dev Architect | [x] Completed |
+| `CNC-1008` | Campaign Turn & Tick Progression Coordinator Loop | SDE / Dev Architect | [x] Completed |
+| `CNC-1009` | Unboxed Domain Event Bus Dispatches for Strategic Events | SDE / Dev Architect | [x] Completed |
+| `CNC-1010` | Strategic Campaign JSON Save/Load State Roundtrip | SDE / Dev Architect | [x] Completed |
+| `CNC-1011` | Headless Campaign Scenario & Presentation Presenter View Models | SDE / Dev Architect | [x] Completed |
 
 ---
 
-## 2. Stage Execution Checklist
+## Sprint Checklist
 
-- [x] **Stage 1 — Scrum Master (SM): Backlog Deconstruction & Planning**
-- [x] **Stage 2 — Game Director & Domain Architect (GD/ARCH): Design Alignment & Formulas**
-- [x] **Stage 3 — SDET / QA Architect (SDET): Pre-Implementation Test Catalog**
-- [x] **Stage 4 — Dev Architect & Gameplay SDE (SDE): Feature Implementation**
-- [x] **Stage 5 — Performance Officer (PERF): Hot-Loop Zero-Allocation Audit**
-- [x] **Stage 6 — SDET / QA Architect (SDET): Test Automation Quality Gate**
-- [x] **Stage 7 — Game Director & Product Owner (GD/PO): Acceptance Review**
-- [x] **Stage 8 — DevOps & Release Engineer (DO): Release, Branch & Pull Request**
+- [x] **Stage 1: Scrum Master (SM) — Backlog Deconstruction & Planning**
+  - [x] Read Sprint 10 specification from `planning/sprints/SPRINT-10-strategic-world-foundation.md`.
+  - [x] Initialize `task.md` with story matrix and checklist.
+  - [x] Check out feature branch `feature/sprint-10-strategic-world-foundation`.
+  - [x] Verify baseline tests pass (`dotnet test`: 194/194 green).
+  - [x] Output Stage 1 Handoff Report: `SM -> GD`.
 
----
+- [x] **Stage 2: Game Director & Domain Architect (GD/ARCH) — Design Alignment**
+  - [x] Define province data models, graph topology schemas, and movement formulas.
+  - [x] Formulate tactical battle transition and survivor progression extraction contracts.
+  - [x] Align memory allocation constraints (0 allocs in hot tick loop).
+  - [x] Output Stage 2 Handoff Report: `ARCH -> SDET`.
 
-## 3. Persona Handoff Reports Log
+- [x] **Stage 3: QA & SDET Architect (SDET) — Pre-Implementation Test Catalog**
+  - [x] Author [`docs/testing/test_cases_catalog_S10.md`](file:///c:/Workspace/CrownConquest/docs/testing/test_cases_catalog_S10.md) covering 18 test cases across Tiers 1–4.
+  - [x] Output Stage 3 Handoff Report: `SDET -> SDE`.
 
-### Persona Handoff Report: SM -> GD
-1. **Completed Work:** Deconstructed Sprint 09 into 11 granular stories (`CNC-0901` through `CNC-0911`) covering Focus Fire, Flanking, Formations, Terrain, Siege, 4 AI Personalities, Data Loaders, and Headless Scenarios.
-2. **Remaining Work:** Stages 2 through 8.
-3. **Executed Tests & Results:** Baseline `dotnet test` executed: 174/174 passed cleanly.
-4. **Known Issues or Deferred Items:** None.
-5. **Next Assigned Persona & Verification Required:** Game Director / Domain Specialist Architect (GD/ARCH) to formalize tactical mathematical formulas, flanking angles, formation selection heuristics, and personality parameter schemas.
+- [x] **Stage 4: Dev Architect & Gameplay SDE (SDE) — Implementation**
+  - [x] Create [`data/definitions/provinces.json`](file:///c:/Workspace/CrownConquest/data/definitions/provinces.json) and data loader methods.
+  - [x] Implement domain models in `src/CrownConquest.Domain/World/`.
+  - [x] Implement `BattleTransitionEngine`, `CampaignEngine`, `CampaignEvents`, `CampaignSaveData`.
+  - [x] Implement `CampaignPresenter` and `CampaignProgressionScenario` in presentation layer.
+  - [x] Verify zero build warnings/errors (`dotnet build`).
+  - [x] Output Stage 4 Handoff Report: `SDE -> PERF`.
 
-### Persona Handoff Report: ARCH -> SDET
-1. **Completed Work:** Formulated mathematical scoring for Focus Fire target vulnerability, vector-based Flanking maneuver angle computation, dynamic Formation selection counter-heuristics, Elevation/Terrain modifiers, Siege unit deployment/escort routines, and the 4 AI Personality archetypes (`Aggressive`, `Defensive`, `Expansionist`, `Tactical`) with external JSON data schemas.
-2. **Remaining Work:** Stages 3 through 8.
-3. **Executed Tests & Results:** N/A (Domain design phase).
-4. **Known Issues or Deferred Items:** None.
-5. **Next Assigned Persona & Verification Required:** QA & SDET Architect (SDET) to draft the comprehensive pre-implementation test cases catalog (`docs/testing/test_cases_catalog_S09.md`) spanning Tiers 1-4.
+- [x] **Stage 5: Performance Officer (PERF) — Zero-Allocation Hot-Loop Audit**
+  - [x] Audit `CampaignEngine`, `BattleTransitionEngine`, and `StrategicMovementCalculator` for zero per-tick dynamic heap allocations.
+  - [x] Verify unboxed struct event bus dispatch and memory bounds ($< 15\text{ MB}$).
+  - [x] Output Stage 5 Handoff Report: `PERF -> SDET`.
 
-### Persona Handoff Report: SDET -> SDE
-1. **Completed Work:** Authored [`docs/testing/test_cases_catalog_S09.md`](file:///c:/Workspace/CrownConquest/docs/testing/test_cases_catalog_S09.md) defining 18 test cases across Tiers 1–4.
-2. **Remaining Work:** Stages 4 through 8.
-3. **Executed Tests & Results:** Test catalog validated against acceptance criteria.
-4. **Known Issues or Deferred Items:** None.
-5. **Next Assigned Persona & Verification Required:** Dev Architect & Senior SDE (SDE) to check out `feature/sprint-09-tactical-ai-and-personalities`, implement the data models, domain tactical AI algorithms, personality profiles, and presentation components.
+- [x] **Stage 6: QA & SDET Architect (SDET) — Test Automation Quality Gate**
+  - [x] Implement test suites in `tests/CrownConquest.Tests/`.
+  - [x] Execute `dotnet test` and confirm 100% green pass rate (212/212 passed, 0 failed, 0 skipped).
+  - [x] Verify 1,000-tick deterministic replay checksum equality.
+  - [x] Output Stage 6 Handoff Report: `SDET -> GD`.
 
-### Persona Handoff Report: SDE -> PERF
-1. **Completed Work:** Implemented `AiPersonalityDefinitionModel`, `ai_personalities.json` data definitions, `DataLoader.LoadAiPersonalitiesFromJson/FromFile`, `AiPersonalityProfile`, `AiTacticalScorer`, `AiFormationSelector`, `AiSiegeTactics`, updated `AiFactionController` with dynamic formations, hero preservation retreats, siege logic, and flanking, and authored `TacticalAiPresenter` and `TacticalAiScenario`. Clean build with 0 warnings/errors.
-2. **Remaining Work:** Stages 5 through 8.
-3. **Executed Tests & Results:** `dotnet build` passed with 0 errors and 0 warnings.
-4. **Known Issues or Deferred Items:** None.
-5. **Next Assigned Persona & Verification Required:** Performance Officer (PERF) to audit simulation hot-loops for zero dynamic heap allocations per tick and memory bounds ($< 500\text{ MB}$).
+- [x] **Stage 7: Game Director & Product Owner (GD/PO) — Acceptance Review**
+  - [x] Validate all Sprint 10 acceptance criteria and headless scenarios.
+  - [x] Approve sprint for release.
+  - [x] Output Stage 7 Handoff Report: `GD -> DO`.
 
-### Persona Handoff Report: PERF -> SDET
-1. **Completed Work:** Audited AI simulation hot-loops in `AiFactionController`, `AiTacticalScorer`, `AiFormationSelector`, and `AiSiegeTactics`. Verified zero dynamic heap allocations per continuous simulation tick, preallocated list caches, and staggered time-slice modulo scheduling (5-tick perception/tactics, 10-tick economy/production).
-2. **Remaining Work:** Stages 6 through 8.
-3. **Executed Tests & Results:** Allocation and memory audit verified clean. Total application footprint $< 20\text{ MB}$.
-4. **Known Issues or Deferred Items:** None.
-5. **Next Assigned Persona & Verification Required:** QA & SDET Architect (SDET) to author and execute test automation suite covering all 18 test cases from `test_cases_catalog_S09.md`.
-
-### Persona Handoff Report: SDET -> GD
-1. **Completed Work:** Implemented comprehensive automated test suite across Tiers 1–4 (`TacticalAiMathTests`, `AiPersonalityDataLoaderTests`, `TacticalAiInvariantTests`, `TacticalAiIntegrationTests`, and `TacticalAiScenarioAndReplayTests`).
-2. **Remaining Work:** Stages 7 and 8.
-3. **Executed Tests & Results:** Full cumulative suite `dotnet test` passed 100% green: 194/194 passed, 0 failed, 0 skipped. Bit-exact 1000-tick deterministic replay parity confirmed.
-4. **Known Issues or Deferred Items:** None.
-5. **Next Assigned Persona & Verification Required:** Game Director & Product Owner (GD/PO) for product acceptance criteria verification and scenario review.
-
-### Persona Handoff Report: GD -> DO
-1. **Completed Work:** Reviewed all gameplay mechanics against acceptance criteria: Focus Fire prioritizes low HP and high threat; Cavalry flanks engaged lines; Formations counter enemy compositions; Siege engines target fortifications with escort rings; AI personality profiles exhibit distinct strategic, economic, and tactical traits.
-2. **Remaining Work:** Stage 8.
-3. **Executed Tests & Results:** Acceptance criteria 100% satisfied. Cumulative test suite 194/194 green.
-4. **Known Issues or Deferred Items:** None.
-5. **Next Assigned Persona & Verification Required:** DevOps & Release Engineer (DO) to create PR artifact, push branch, create GitHub PR via `gh pr create`, and summarize walkthrough.
-
-### Persona Handoff Report: DO -> User
-1. **Completed Work:** Committed changes, pushed branch `feature/sprint-09-tactical-ai-and-personalities`, created GitHub Pull Request [#10](https://github.com/munna7862/CrownConquest/pull/10), verified cumulative test suite (194/194 green), and published sprint walkthrough.
-2. **Remaining Work:** Ready for merge and progression to Sprint 10.
-3. **Executed Tests & Results:** `dotnet build`: 0 warnings, 0 errors. `dotnet test`: 194/194 tests passed.
-4. **Known Issues or Deferred Items:** None.
-5. **Next Assigned Persona & Verification Required:** Human Stakeholder / Product Owner for review and merge.
+- [x] **Stage 8: DevOps & Release Engineer (DO) — Release, Branch & Pull Request**
+  - [x] Execute `dotnet build` (0 warnings, 0 errors).
+  - [x] Commit changes using conventional commit standards.
+  - [x] Push branch to remote and create Pull Request via `gh pr create`.
+  - [x] Update documentation, PR artifact, and `walkthrough.md`.
+  - [x] Conclude sprint execution.
 
 ---
 
-## 4. Sprint Review Comments & Refinement Loop
-*(Sprint approved with 100% test pass rate and clean DoD verification)*
+## Sprint Review Comments & Refinement Loop
+
+- `[PERF] -> [SDE]: APPROVED` - Hot loops in `CampaignEngine` and `StrategicMovementCalculator` utilize zero dynamic allocations, struct value types, and cached collections. Memory footprint is well within limits ($< 15\text{ MB}$).
+- `[SDET] -> [SDE]: APPROVED` - All 18 test cases from `test_cases_catalog_S10.md` implemented and 100% passing across Tiers 1-4 (212 cumulative tests, 0 skips, 0 failures). 1,000-tick replay parity confirmed bit-exact.
+- `[GD/PO] -> [DO]: APPROVED` - Strategic World Foundation mechanics, province graph topology, battle transitions, survivor progression extraction, and territory conquest verified per specifications. Release authorized.

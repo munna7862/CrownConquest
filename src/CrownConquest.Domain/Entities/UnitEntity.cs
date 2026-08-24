@@ -117,7 +117,10 @@ public sealed class UnitEntity
         UnitArchetype? archetype = null,
         HeroState? heroState = null,
         float maxMorale = 100.0f,
-        FormationType formation = FormationType.Line)
+        FormationType formation = FormationType.Line,
+        int initialLevel = 1,
+        int initialXp = 0,
+        float? initialCurrentHealth = null)
     {
         Id = id;
         FactionId = factionId;
@@ -138,13 +141,15 @@ public sealed class UnitEntity
         KillXpValue = killXpValue;
         AggroRange = aggroRange;
         State = UnitState.Idle;
-        Veterancy = new VeterancyState(id, customThresholds: xpThresholds);
+        Veterancy = new VeterancyState(id, initialLevel: initialLevel, initialXp: initialXp, customThresholds: xpThresholds);
         WorkerState = workerState;
         HeroState = heroState;
         Morale = new MoraleState(maxMorale);
         Charge = new ChargeState();
         Formation = formation;
-        CurrentHealth = MaxHealth;
+        CurrentHealth = initialCurrentHealth.HasValue && initialCurrentHealth.Value > 0f 
+            ? MathF.Min(MaxHealth, initialCurrentHealth.Value) 
+            : MaxHealth;
     }
 
     public void Move(Vector2D destination)

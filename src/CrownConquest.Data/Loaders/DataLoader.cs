@@ -460,6 +460,46 @@ public static class DataLoader
         string json = File.ReadAllText(filePath);
         return LoadAiPersonalitiesFromJson(json);
     }
+
+    public static Result<List<ProvinceDefinitionModel>> LoadProvincesFromJson(string json)
+    {
+        try
+        {
+            var provinces = JsonSerializer.Deserialize<List<ProvinceDefinitionModel>>(json, JsonOptions);
+            if (provinces == null || provinces.Count == 0)
+            {
+                return Result<List<ProvinceDefinitionModel>>.Failure(new GameError("EMPTY_DATA", "Provinces definition is empty."));
+            }
+
+            foreach (var p in provinces)
+            {
+                if (string.IsNullOrWhiteSpace(p.Id))
+                {
+                    return Result<List<ProvinceDefinitionModel>>.Failure(new GameError("INVALID_PROVINCE_ID", "Province ID cannot be empty."));
+                }
+                if (p.GarrisonDefenseBonus <= 0f)
+                {
+                    return Result<List<ProvinceDefinitionModel>>.Failure(new GameError("INVALID_PROVINCE_STATS", $"Invalid garrison defense bonus for province {p.Id}."));
+                }
+            }
+
+            return Result<List<ProvinceDefinitionModel>>.Success(provinces);
+        }
+        catch (Exception ex)
+        {
+            return Result<List<ProvinceDefinitionModel>>.Failure(new GameError("JSON_PARSE_ERROR", ex.Message));
+        }
+    }
+
+    public static Result<List<ProvinceDefinitionModel>> LoadProvincesFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            return Result<List<ProvinceDefinitionModel>>.Failure(new GameError("FILE_NOT_FOUND", $"Definition file not found: {filePath}"));
+        }
+        string json = File.ReadAllText(filePath);
+        return LoadProvincesFromJson(json);
+    }
 }
 
 
