@@ -132,7 +132,55 @@ sequenceDiagram
     DO->>User: Hand off for Human Review & Merge (<!-- GOAL_COMPLETE -->)
 ```
 
+### 5.3 Sprint Execution Stage-by-Stage Protocol
+
+When the user initiates a sprint (e.g. `/goal start and execute Sprint XX`), the AI assistant must execute the stages in exact sequential order, explicitly announcing the active persona and publishing the 5-point handoff report at each transition:
+
+1. **Stage 1 — Scrum Master (SM): Backlog Deconstruction & Planning**
+   - Read the sprint specification in `planning/sprints/SPRINT-XX-*.md`.
+   - Initialize/Update `task.md` with the story ownership matrix and checklist.
+   - Output `### [ACTIVE PERSONA: SCRUM MASTER (SM)]` followed by `### Persona Handoff Report: SM -> GD`.
+
+2. **Stage 2 — Game Director (GD) & Domain Specialist Architect (ARCH): Design Alignment**
+   - Review domain mechanics, combat/progression balance, data models, and formulas.
+   - Define exact formula requirements and state invariants.
+   - Output `### [ACTIVE PERSONA: GAME DIRECTOR / DOMAIN ARCHITECT (GD/ARCH)]` followed by `### Persona Handoff Report: ARCH -> SDET`.
+
+3. **Stage 3 — SDET / QA Architect (SDET): Pre-Implementation Test Catalog**
+   - Author `docs/testing/test_cases_catalog_SXX.md` with complete positive, negative, boundary, and invariant test matrix across Tiers 1–4.
+   - Output `### [ACTIVE PERSONA: QA & SDET ARCHITECT (SDET)]` followed by `### Persona Handoff Report: SDET -> SDE`.
+
+4. **Stage 4 — Dev Architect & Gameplay SDE (SDE): Implementation**
+   - Create and checkout `feature/sprint-XX-<name>` branch.
+   - Implement Data definitions/loaders, Domain entities/systems, Commands/Events, and Presentation view models.
+   - Perform Dev Technical Code Acceptance Review.
+   - Output `### [ACTIVE PERSONA: DEV ARCHITECT & SENIOR SDE (SDE)]` followed by `### Persona Handoff Report: SDE -> PERF`.
+
+5. **Stage 5 — Performance Officer (PERF): Zero-Allocation Hot-Loop Audit**
+   - Audit simulation hot loops (`Tick`, `UpdateUnits`, `UpdateCombat`, `UpdateEconomy`) for zero per-tick dynamic heap allocations.
+   - Ensure memory bounds ($< 500\text{ MB}$) and DOD/struct optimizations.
+   - Output `### [ACTIVE PERSONA: PERFORMANCE OFFICER (PERF)]` followed by `### Persona Handoff Report: PERF -> SDET`.
+
+6. **Stage 6 — SDET / QA Architect (SDET): Test Automation Quality Gate**
+   - Script unit, invariant, integration, and headless scenario tests across Tiers 1–4.
+   - Execute `dotnet test` and ensure 100% green pass rate (0 failures, 0 skips).
+   - Verify 1000-tick deterministic replay checksum equality.
+   - Output `### [ACTIVE PERSONA: QA & SDET ARCHITECT (SDET)]` followed by `### Persona Handoff Report: SDET -> GD`.
+
+7. **Stage 7 — Game Director & Product Owner (GD/PO): Acceptance Review**
+   - Conduct acceptance review against sprint acceptance criteria and headless scenarios.
+   - Verify game balance, pacing, and visual presentation integration.
+   - Output `### [ACTIVE PERSONA: GAME DIRECTOR & PRODUCT OWNER (GD/PO)]` followed by `### Persona Handoff Report: GD -> DO`.
+
+8. **Stage 8 — DevOps & Release Engineer (DO): Release, Branch & Pull Request**
+   - Execute `dotnet build` to confirm 0 warnings and 0 errors.
+   - Stage and commit changes using conventional commit messages.
+   - Push feature branch to origin and create Pull Request via `gh pr create`.
+   - Update `task.md` and `walkthrough.md` with all execution data and PR link.
+   - Output `### [ACTIVE PERSONA: DEVOPS & RELEASE ENGINEER (DO)]` and conclude with `<!-- GOAL_COMPLETE -->`.
+
 ---
+
 
 ## 6. Review Severity & Refinement Protocol
 
