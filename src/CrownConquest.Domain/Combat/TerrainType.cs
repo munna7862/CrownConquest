@@ -12,7 +12,8 @@ public enum TerrainType
     Hills = 2,
     Marsh = 3,
     Road = 4,
-    Water = 5
+    Water = 5,
+    Rubble = 6
 }
 
 /// <summary>
@@ -43,6 +44,7 @@ public readonly struct TerrainModifiers : IEquatable<TerrainModifiers>
     public static TerrainModifiers Marsh => new(0.6f, -1, 0.0f, 0.4f);
     public static TerrainModifiers Road => new(1.25f, 0, 0.0f, 1.1f);
     public static TerrainModifiers Water => new(0.0f, 0, 0.0f, 0.0f);
+    public static TerrainModifiers Rubble => new(0.75f, 0, 0.20f, 0.5f);
 
     public static TerrainModifiers GetDefault(TerrainType type) => type switch
     {
@@ -52,6 +54,7 @@ public readonly struct TerrainModifiers : IEquatable<TerrainModifiers>
         TerrainType.Marsh => Marsh,
         TerrainType.Road => Road,
         TerrainType.Water => Water,
+        TerrainType.Rubble => Rubble,
         _ => Plains
     };
 

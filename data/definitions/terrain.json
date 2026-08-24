@@ -52,5 +52,14 @@
     "rangedCoverMitigation": 0.0,
     "chargeSpeedMultiplier": 0.0,
     "description": "Impassable water body blocking all ground unit transit."
+  },
+  {
+    "id": "rubble",
+    "name": "Rubble",
+    "movementSpeedMultiplier": 0.75,
+    "elevationLevel": 0,
+    "rangedCoverMitigation": 0.20,
+    "chargeSpeedMultiplier": 0.5,
+    "description": "Destroyed fortification rubble providing 20% cover with 25% movement penalty."
   }
 ]

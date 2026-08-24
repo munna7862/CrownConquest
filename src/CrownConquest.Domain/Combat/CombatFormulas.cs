@@ -22,6 +22,15 @@ public static class CombatFormulas
     public const float HighGroundRangeBonus = 2.0f; // +2 tiles
     public const float SpearBraceRecoilPercentage = 0.50f; // 50% charge damage reflected
 
+    public const float BatteringRamStructuralMultiplier = 5.0f; // 5x vs buildings/walls/gates
+    public const float CatapultStructuralMultiplier = 4.0f; // 4x vs buildings/walls/towers
+    public const float BallistaStructuralMultiplier = 2.5f; // 2.5x vs buildings
+    public const float BatteringRamPierceMitigation = 0.80f; // 80% damage reduction from ranged
+    public const float BallistaArmorPenetration = 0.60f; // 60% target armor ignored
+    public const float CatapultMinRange = 3.0f;
+    public const float CatapultMaxRange = 12.0f;
+    public const float CatapultSplashRadius = 2.5f;
+
     /// <summary>
     /// Calculates archetype interaction damage multiplier based on RTS combat triangle.
     /// </summary>
@@ -209,6 +218,7 @@ public static class CombatFormulas
         // 8. Combine multipliers
         float archetypeMultiplier = GetArchetypeMultiplier(attackerArchetype, targetArchetype);
         float moraleAtkMultiplier = GetMoraleDamageMultiplier(attackerMorale);
+        float siegePierceMitigation = (targetArchetype == UnitArchetype.Siege && isRangedAttack) ? (1.0f - BatteringRamPierceMitigation) : 1.0f;
 
         float totalAttack = (attackerRawAttack + techAttackBonus) * (1.0f + attackerAuraDamageBonus);
         float combinedModifier = customModifier
@@ -217,7 +227,8 @@ public static class CombatFormulas
             * elevationMultiplier
             * coverMultiplier
             * moraleAtkMultiplier
-            * chargeDamageMultiplier;
+            * chargeDamageMultiplier
+            * siegePierceMitigation;
 
         float effectiveDamage = CalculateEffectiveDamage(totalAttack, totalArmor, combinedModifier);
         return (effectiveDamage, chargeBlocked, recoilDamage);
@@ -289,5 +300,104 @@ public static class CombatFormulas
         float effectiveArmor = MathF.Max(0f, targetArmor * (1.0f - armorPenetration));
         float finalDamage = rawSpellPower - effectiveArmor;
         return MathF.Max(MinimumDamageFloor, finalDamage);
+    }
+
+    /// <summary>
+    /// Calculates structural damage dealt by a unit against buildings, walls, gates, and towers.
+    /// </summary>
+    public static float CalculateStructuralCombatDamage(
+        UnitArchetype attackerArchetype,
+        string attackerUnitType,
+        float attackerRawAttack,
+        TechModifiers attackerTech,
+        float buildingArmor = 0f,
+        float customModifier = 1.0f)
+    {
+        float multiplier = 1.0f;
+        var lower = attackerUnitType.ToLowerInvariant();
+        if (lower.Contains("ram"))
+        {
+            multiplier = BatteringRamStructuralMultiplier; // 5.0x
+        }
+        else if (lower.Contains("catapult") || lower.Contains("onager") || lower.Contains("trebuchet"))
+        {
+            multiplier = CatapultStructuralMultiplier; // 4.0x
+        }
+        else if (lower.Contains("ballista") || lower.Contains("scorpion"))
+        {
+            multiplier = BallistaStructuralMultiplier; // 2.5x
+        }
+        else if (attackerArchetype == UnitArchetype.Siege)
+        {
+            multiplier = 4.0f;
+        }
+
+        float techBonus = attackerArchetype switch
+        {
+            UnitArchetype.Infantry or UnitArchetype.Spearman or UnitArchetype.Hero => attackerTech.MeleeAttackBonus,
+            UnitArchetype.Archer => attackerTech.RangedAttackBonus,
+            UnitArchetype.Cavalry => attackerTech.CavalryAttackBonus,
+            _ => 0f
+        };
+
+        float totalAttack = (attackerRawAttack + techBonus) * multiplier * customModifier;
+        float effective = totalAttack - MathF.Max(0f, buildingArmor);
+        return MathF.Max(MinimumDamageFloor, effective);
+    }
+
+    /// <summary>
+    /// Calculates area of effect splash damage with linear distance falloff (100% at center to 50% at edge).
+    /// </summary>
+    public static float CalculateAreaOfEffectDamage(
+        float baseDamage,
+        float distanceToCenter,
+        float splashRadius)
+    {
+        if (splashRadius <= 0.001f || distanceToCenter <= 0.001f)
+        {
+            return MathF.Max(MinimumDamageFloor, baseDamage);
+        }
+
+        if (distanceToCenter > splashRadius)
+        {
+            return 0f;
+        }
+
+        float ratio = distanceToCenter / splashRadius;
+        float falloff = 1.0f - (0.5f * ratio);
+        return MathF.Max(MinimumDamageFloor, baseDamage * falloff);
+    }
+
+    /// <summary>
+    /// Calculates direct armor piercing damage (e.g. Ballista bolts ignoring a portion of armor).
+    /// </summary>
+    public static float CalculateArmorPiercingDamage(
+        float rawDamage,
+        float targetArmor,
+        float armorPenetration = BallistaArmorPenetration)
+    {
+        float effectiveArmor = MathF.Max(0f, targetArmor * (1.0f - Math.Clamp(armorPenetration, 0f, 1f)));
+        float mitigated = rawDamage - effectiveArmor;
+        return MathF.Max(MinimumDamageFloor, mitigated);
+    }
+
+    /// <summary>
+    /// Evaluates if target position is within min and max attack range of a siege weapon (e.g. Catapult min 3.0, max 12.0).
+    /// </summary>
+    public static bool IsSiegeInRange(
+        Vector2D attackerPos,
+        Vector2D targetPos,
+        float minRange,
+        float maxRange,
+        float rangeBonus = 0f,
+        int attackerElevation = 0,
+        int targetElevation = 0)
+    {
+        float elevationBonus = GetElevationRangeBonus(attackerElevation, targetElevation);
+        float totalMaxRange = MathF.Max(0.5f, maxRange + rangeBonus + elevationBonus) + 0.1f;
+        float totalMinRange = MathF.Max(0f, minRange - 0.1f);
+        float distSq = attackerPos.DistanceSquaredTo(targetPos);
+
+        return distSq <= (totalMaxRange * totalMaxRange) && distSq >= (totalMinRange * totalMinRange);
     }
 }
