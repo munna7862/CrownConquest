@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CrownConquest.Domain.AI;
 using CrownConquest.Domain.Combat;
 using CrownConquest.Domain.Commands;
 using CrownConquest.Domain.Common;
@@ -25,6 +26,7 @@ public sealed class SimulationEngine
     private readonly SpatialGrid _spatialGrid;
     private readonly List<EntityId> _queryBuffer = new(64);
     private readonly Dictionary<string, TechnologyDefinition> _techRegistry = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<AiFactionController> _aiControllers = new(4);
 
     public ulong CurrentTick => _state.CurrentTick;
     public SimulationConfig Config => _config;
@@ -35,6 +37,7 @@ public sealed class SimulationEngine
     public BattlefieldBounds Bounds => _bounds;
     public SpatialGrid SpatialGrid => _spatialGrid;
     public IReadOnlyDictionary<string, TechnologyDefinition> TechRegistry => _techRegistry;
+    public IReadOnlyList<AiFactionController> AiControllers => _aiControllers;
 
     public SimulationEngine(
         SimulationConfig? config = null,
@@ -168,6 +171,9 @@ public sealed class SimulationEngine
         // 1. Process staged commands deterministically
         ProcessCommands(tick);
 
+        // 1.5. Update autonomous AI controllers
+        UpdateAi(tick);
+
         // 2. Update hero mana regen and ability cooldowns
         UpdateHeroes(tick);
 
@@ -203,6 +209,34 @@ public sealed class SimulationEngine
 
         // 12. Cleanup deceased entities and depleted nodes at tick boundary
         CleanupEntities();
+    }
+
+    public void RegisterAiController(AiFactionController controller)
+    {
+        ArgumentNullException.ThrowIfNull(controller);
+        if (!_aiControllers.Contains(controller))
+        {
+            _aiControllers.Add(controller);
+        }
+    }
+
+    public void UnregisterAiController(FactionId factionId)
+    {
+        for (int i = _aiControllers.Count - 1; i >= 0; i--)
+        {
+            if (_aiControllers[i].FactionId == factionId)
+            {
+                _aiControllers.RemoveAt(i);
+            }
+        }
+    }
+
+    private void UpdateAi(ulong tick)
+    {
+        for (int i = 0; i < _aiControllers.Count; i++)
+        {
+            _aiControllers[i].Update(_state, _commandQueue, tick);
+        }
     }
 
     /// <summary>
@@ -1197,6 +1231,7 @@ public sealed class SimulationEngine
                             if (harvested > 0)
                             {
                                 worker.AddCarried(node.ResourceType, harvested);
+                                _eventBus.Publish(new ResourceHarvestedEvent(tick, unit.Id, node.Id, node.ResourceType, harvested, worker.CarriedAmount));
                             }
                         }
 
@@ -2675,17 +2710,13 @@ public sealed class SimulationEngine
         {
             return (new ResourceCost(Food: 50, Gold: 25), 65, 1);
         }
-        if (lower.Contains("heavy_cavalry") || lower.Contains("knight"))
+        if (lower.Contains("cavalry") || lower.Contains("knight") || lower.Contains("equite") || lower.Contains("horseman") || lower.Contains("scout"))
         {
-            return (new ResourceCost(Food: 90, Gold: 100), 110, 1);
-        }
-        if (lower.Contains("scout_cavalry") || lower.Contains("scout"))
-        {
+            if (lower.Contains("heavy"))
+            {
+                return (new ResourceCost(Food: 90, Gold: 100), 110, 1);
+            }
             return (new ResourceCost(Food: 75, Gold: 50), 80, 1);
-        }
-        if (lower.Contains("equite"))
-        {
-            return (new ResourceCost(Food: 80, Gold: 80), 100, 1);
         }
         if (lower.Contains("legionary"))
         {

@@ -80,8 +80,26 @@ public sealed class BuildingEntity
         MaxHealth = Math.Max(1f, maxHealth);
         BaseBuildTimeTicks = Math.Max(1f, baseBuildTimeTicks);
         PopulationProvided = populationProvided;
-        _acceptedDropOffTypes = acceptedDropOffTypes != null ? new HashSet<ResourceType>(acceptedDropOffTypes) : new HashSet<ResourceType>();
-        BaseCost = baseCost ?? new ResourceCost(Wood: 100);
+        BaseCost = baseCost ?? (buildingType.ToLowerInvariant() switch
+        {
+            "guard_tower" => new ResourceCost(Wood: 100, Stone: 200),
+            "watchtower" or "tower" => new ResourceCost(Wood: 50, Stone: 125),
+            "ballista_tower" => new ResourceCost(Wood: 120, Stone: 250, Iron: 50),
+            "stone_wall" or "wall" => new ResourceCost(Stone: 30),
+            "stone_gate" => new ResourceCost(Stone: 100, Iron: 25),
+            "wooden_gate" => new ResourceCost(Wood: 50),
+            "siege_workshop" => new ResourceCost(Wood: 200, Stone: 100, Iron: 50),
+            "town_center" => new ResourceCost(Wood: 275, Stone: 100),
+            "barracks" => new ResourceCost(Wood: 150),
+            "farm" => new ResourceCost(Wood: 60),
+            "house" => new ResourceCost(Wood: 50),
+            _ => new ResourceCost(Wood: 100)
+        });
+        _acceptedDropOffTypes = acceptedDropOffTypes != null
+            ? new HashSet<ResourceType>(acceptedDropOffTypes)
+            : (buildingType.Equals("town_center", StringComparison.OrdinalIgnoreCase)
+                ? new HashSet<ResourceType> { ResourceType.Food, ResourceType.Wood, ResourceType.Gold, ResourceType.Stone, ResourceType.Iron }
+                : new HashSet<ResourceType>());
         IsFarm = isFarm || buildingType.Equals("farm", StringComparison.OrdinalIgnoreCase);
         MaxFarmFood = maxFarmFood;
         FarmFoodRemaining = IsFarm ? maxFarmFood : 0;
