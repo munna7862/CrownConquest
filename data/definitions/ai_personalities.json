@@ -1,0 +1,62 @@
+[
+  {
+    "Id": "aggressive",
+    "Name": "Aggressive Raider",
+    "Archetype": "Aggressive",
+    "Description": "Prioritizes fast military production, early cavalry harassment, wedge formations, aggressive flanking, and lower retreat thresholds.",
+    "RetreatOddsThreshold": 0.25,
+    "RetreatHealthThreshold": 0.20,
+    "TargetWorkerCount": 12,
+    "AttackSquadThreshold": 6,
+    "FlankingDesire": 1.0,
+    "ElevationBias": 1.0,
+    "HeroPreservation": false,
+    "PreferredFormation": "Wedge",
+    "BaseDefenseRadius": 20.0
+  },
+  {
+    "Id": "defensive",
+    "Name": "Defensive Bastion",
+    "Archetype": "Defensive",
+    "Description": "Focuses on stone fortifications, defensive towers, Square and ShieldWall formations, high-ground staging, and cautious retreats.",
+    "RetreatOddsThreshold": 0.55,
+    "RetreatHealthThreshold": 0.40,
+    "TargetWorkerCount": 18,
+    "AttackSquadThreshold": 12,
+    "FlankingDesire": 0.2,
+    "ElevationBias": 1.4,
+    "HeroPreservation": false,
+    "PreferredFormation": "Square",
+    "BaseDefenseRadius": 45.0
+  },
+  {
+    "Id": "expansionist",
+    "Name": "Imperial Expansionist",
+    "Archetype": "Expansionist",
+    "Description": "Rapidly expands economy and worker population, secures secondary resource nodes, and launches massive late-game combined-arms deathballs.",
+    "RetreatOddsThreshold": 0.45,
+    "RetreatHealthThreshold": 0.30,
+    "TargetWorkerCount": 24,
+    "AttackSquadThreshold": 16,
+    "FlankingDesire": 0.5,
+    "ElevationBias": 1.1,
+    "HeroPreservation": false,
+    "PreferredFormation": "Line",
+    "BaseDefenseRadius": 30.0
+  },
+  {
+    "Id": "tactical",
+    "Name": "Tactical Mastermind",
+    "Archetype": "Tactical",
+    "Description": "Focuses on hero leveling and preservation, coordinated focus firing, flanking cavalry maneuvers, terrain elevation bonuses, and dynamic formation counter-picks.",
+    "RetreatOddsThreshold": 0.45,
+    "RetreatHealthThreshold": 0.30,
+    "TargetWorkerCount": 15,
+    "AttackSquadThreshold": 8,
+    "FlankingDesire": 0.85,
+    "ElevationBias": 1.5,
+    "HeroPreservation": true,
+    "PreferredFormation": "Line",
+    "BaseDefenseRadius": 30.0
+  }
+]

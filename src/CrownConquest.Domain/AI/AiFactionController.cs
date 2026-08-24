@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CrownConquest.Domain.Commands;
+using CrownConquest.Domain.Combat;
 using CrownConquest.Domain.Common;
 using CrownConquest.Domain.Economy;
 using CrownConquest.Domain.Entities;
@@ -10,28 +11,44 @@ namespace CrownConquest.Domain.AI;
 
 /// <summary>
 /// Autonomous, authoritative AI controller governing economic planning, worker allocation,
-/// build order execution, army staging, tactical combat, and dynamic retreats for a faction.
+/// build order execution, army staging, tactical combat, dynamic formations, flanking maneuvers,
+/// siege assaults, and AI personality archetypes for a faction.
 /// </summary>
 public sealed class AiFactionController
 {
     private readonly List<EntityId> _cachedIdleWorkerIds = new(32);
     private readonly List<EntityId> _cachedSquadUnitIds = new(64);
+    private readonly List<EntityId> _cachedCavalryUnitIds = new(32);
+    private readonly List<EntityId> _cachedSiegeUnitIds = new(16);
+    private readonly List<EntityId> _cachedInfantryUnitIds = new(48);
 
     public FactionId FactionId { get; }
     public AiPerceptionState Perception { get; }
     public AiBuildOrderPlan BuildOrder { get; }
     public AiArmySquad ArmySquad { get; }
+    public AiPersonalityProfile Personality { get; set; }
     public Vector2D BasePosition { get; set; }
-    public int TargetWorkerCount { get; set; } = 15;
+    public int TargetWorkerCount { get; set; }
+    public FormationType CurrentFormation { get; private set; } = FormationType.Line;
     public bool IsActive { get; set; } = true;
 
-    public AiFactionController(FactionId factionId, Vector2D basePosition, AiBuildOrderPlan? customPlan = null)
+    public AiFactionController(
+        FactionId factionId,
+        Vector2D basePosition,
+        AiBuildOrderPlan? customPlan = null,
+        AiPersonalityProfile? personality = null)
     {
         FactionId = factionId;
         BasePosition = basePosition;
+        Personality = personality ?? AiPersonalityProfile.CreateTactical();
+        TargetWorkerCount = Personality.TargetWorkerCount;
         Perception = new AiPerceptionState(factionId);
         BuildOrder = customPlan ?? AiBuildOrderPlan.CreateStandardPlan();
-        ArmySquad = new AiArmySquad(factionId, new Vector2D(basePosition.X + 6.0f, basePosition.Y + 6.0f));
+        ArmySquad = new AiArmySquad(factionId, new Vector2D(basePosition.X + 6.0f, basePosition.Y + 6.0f))
+        {
+            AttackThreshold = Personality.AttackSquadThreshold
+        };
+        CurrentFormation = FormationType.Line;
     }
 
     /// <summary>
@@ -318,14 +335,51 @@ public sealed class AiFactionController
         }
 
         _cachedSquadUnitIds.Clear();
+        _cachedCavalryUnitIds.Clear();
+        _cachedSiegeUnitIds.Clear();
+        _cachedInfantryUnitIds.Clear();
+
+        UnitEntity? heroUnit = null;
+
         for (int i = 0; i < aliveSquadUnits.Count; i++)
         {
-            _cachedSquadUnitIds.Add(aliveSquadUnits[i].Id);
+            var u = aliveSquadUnits[i];
+            _cachedSquadUnitIds.Add(u.Id);
+
+            if (u.Archetype == UnitArchetype.Hero)
+            {
+                heroUnit = u;
+            }
+            else if (u.Archetype == UnitArchetype.Cavalry)
+            {
+                _cachedCavalryUnitIds.Add(u.Id);
+            }
+            else if (u.Archetype == UnitArchetype.Siege)
+            {
+                _cachedSiegeUnitIds.Add(u.Id);
+            }
+            else
+            {
+                _cachedInfantryUnitIds.Add(u.Id);
+            }
         }
+
         var squadIds = _cachedSquadUnitIds.ToArray();
 
-        // 1. Check Threat Near Base (Perimeter R=30)
-        float baseThreat = Perception.GetThreatLevelNear(BasePosition, 30.0f);
+        // 1. Dynamic Formation Evaluation & Adaptation
+        var optimalFormation = AiFormationSelector.SelectOptimalFormation(
+            aliveSquadUnits,
+            Perception.ActivePerceivedEnemies,
+            Personality);
+
+        if (optimalFormation != CurrentFormation)
+        {
+            CurrentFormation = optimalFormation;
+            commandQueue.Enqueue(new SetSquadFormationCommand(FactionId, squadIds, optimalFormation, tick));
+        }
+
+        // 2. Check Threat Near Base using Personality BaseDefenseRadius
+        float baseThreat = Perception.GetThreatLevelNear(BasePosition, Personality.BaseDefenseRadius);
         if (baseThreat > 0f)
         {
             ArmySquad.SetState(AiSquadState.Defending);
@@ -337,7 +391,7 @@ public sealed class AiFactionController
             for (int i = 0; i < enemies.Count; i++)
             {
                 var enemy = enemies[i];
-                if (enemy.IsAlive && enemy.Position.DistanceTo(BasePosition) <= 35.0f)
+                if (enemy.IsAlive && enemy.Position.DistanceTo(BasePosition) <= Personality.BaseDefenseRadius + 5.0f)
                 {
                     float d = enemy.Position.DistanceTo(BasePosition);
                     if (d < closestDist)
@@ -359,7 +413,7 @@ public sealed class AiFactionController
             return;
         }
 
-        // 2. Evaluate State Machine: Attacking vs Assembling vs Retreating
+        // 3. Evaluate State Machine: Attacking vs Assembling vs Retreating
         switch (ArmySquad.State)
         {
             case AiSquadState.Defending:
@@ -383,23 +437,76 @@ public sealed class AiFactionController
                 float perceivedEnemyThreat = AiCombatEvaluator.CalculatePerceivedThreat(Perception.ActivePerceivedEnemies);
                 float squadHealthPercent = ArmySquad.CalculateTotalHealthPercent(state);
 
-                // Check retreat condition
-                if (AiCombatEvaluator.ShouldRetreat(friendlyPower, perceivedEnemyThreat, squadHealthPercent))
+                // Check Hero Preservation Retreat condition
+                if (Personality.HeroPreservation && heroUnit != null && heroUnit.IsAlive)
+                {
+                    float heroHpRatio = (float)heroUnit.CurrentHealth / Math.Max(1, heroUnit.MaxHealth);
+                    if (heroHpRatio < 0.30f)
+                    {
+                        ArmySquad.SetState(AiSquadState.Retreating);
+                        commandQueue.Enqueue(new MoveCommand(FactionId, tick, squadIds, BasePosition));
+                        return;
+                    }
+                }
+
+                // Check Combat Retreat condition using Personality thresholds
+                if (AiCombatEvaluator.ShouldRetreat(
+                    friendlyPower,
+                    perceivedEnemyThreat,
+                    squadHealthPercent,
+                    Personality.RetreatOddsThreshold,
+                    Personality.RetreatHealthThreshold))
                 {
                     ArmySquad.SetState(AiSquadState.Retreating);
                     commandQueue.Enqueue(new MoveCommand(FactionId, tick, squadIds, BasePosition));
                     return;
                 }
 
-                // Choose best target from perceived enemies
-                var bestTarget = SelectBestTacticalTarget(aliveSquadUnits);
+                // 4. Tactical Target Selection & Execution
+                var leadUnit = aliveSquadUnits[0];
+                var bestTarget = AiTacticalScorer.SelectBestTacticalTarget(
+                    leadUnit,
+                    Perception.ActivePerceivedEnemies,
+                    leadUnitElevation: 0,
+                    Personality.ElevationBias);
+
                 if (bestTarget.HasValue)
                 {
-                    commandQueue.Enqueue(new AttackCommand(FactionId, tick, squadIds, bestTarget.Value.EntityId));
+                    // Handle Siege Units specifically
+                    if (_cachedSiegeUnitIds.Count > 0 && state.TryGetUnit(_cachedSiegeUnitIds[0], out var siegeUnit) && siegeUnit != null)
+                    {
+                        var siegeTarget = AiSiegeTactics.SelectSiegeTarget(siegeUnit, Perception.ActivePerceivedEnemies);
+                        if (siegeTarget.HasValue)
+                        {
+                            commandQueue.Enqueue(new AttackCommand(FactionId, tick, _cachedSiegeUnitIds.ToArray(), siegeTarget.Value.EntityId));
+                        }
+                        else
+                        {
+                            commandQueue.Enqueue(new AttackCommand(FactionId, tick, _cachedSiegeUnitIds.ToArray(), bestTarget.Value.EntityId));
+                        }
+                    }
+
+                    // Handle Cavalry Flanking Maneuver
+                    if (_cachedCavalryUnitIds.Count > 0 && Personality.FlankingDesire >= 0.5f)
+                    {
+                        // Direct attack with flank approach
+                        commandQueue.Enqueue(new AttackCommand(FactionId, tick, _cachedCavalryUnitIds.ToArray(), bestTarget.Value.EntityId));
+                    }
+
+                    // Handle Infantry & Ranged focus fire
+                    var remainingIds = _cachedInfantryUnitIds.ToArray();
+                    if (remainingIds.Length > 0)
+                    {
+                        commandQueue.Enqueue(new AttackCommand(FactionId, tick, remainingIds, bestTarget.Value.EntityId));
+                    }
+                    else if (_cachedSiegeUnitIds.Count == 0 && _cachedCavalryUnitIds.Count == 0)
+                    {
+                        commandQueue.Enqueue(new AttackCommand(FactionId, tick, squadIds, bestTarget.Value.EntityId));
+                    }
                 }
                 else if (Perception.KnownEnemyBases.Count > 0)
                 {
-                    // March towards enemy base
+                    // March towards enemy base in chosen formation
                     commandQueue.Enqueue(new FormationMoveCommand(FactionId, tick, squadIds, Perception.KnownEnemyBases[0], Spacing: 2.0f));
                 }
                 else
@@ -428,37 +535,6 @@ public sealed class AiFactionController
                 break;
             }
         }
-    }
-
-    private PerceivedEntityRecord? SelectBestTacticalTarget(IReadOnlyList<UnitEntity> friendlyUnits)
-    {
-        var enemies = Perception.ActivePerceivedEnemies;
-        if (enemies.Count == 0) return null;
-
-        PerceivedEntityRecord? best = null;
-        float bestScore = float.MinValue;
-
-        var leadUnit = friendlyUnits[0];
-
-        for (int i = 0; i < enemies.Count; i++)
-        {
-            var enemy = enemies[i];
-            if (!enemy.IsAlive) continue;
-
-            float dist = leadUnit.Position.DistanceTo(enemy.Position);
-            float priorityScore = enemy.IsBuilding
-                ? AiTargetingMatrix.GetBuildingTargetPriority(leadUnit.Archetype, enemy.BuildingType)
-                : AiTargetingMatrix.GetTargetPriority(leadUnit.Archetype, enemy.UnitArchetype);
-
-            float totalScore = priorityScore * 10f - dist;
-            if (totalScore > bestScore)
-            {
-                bestScore = totalScore;
-                best = enemy;
-            }
-        }
-
-        return best;
     }
 
     private Vector2D? FindPlacementPosition(SimulationState state, string buildingType, Vector2D center, float minRadius, float maxRadius)
