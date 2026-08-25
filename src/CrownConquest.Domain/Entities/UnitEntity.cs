@@ -164,6 +164,24 @@ public sealed class UnitEntity
         State = UnitState.Moving;
     }
 
+    public void RestoreTacticalState(
+        UnitState state,
+        EntityId attackTargetId,
+        Vector2D? moveTarget,
+        int cooldownRemaining,
+        Vector2D headingDirection,
+        float morale,
+        int momentumTicks)
+    {
+        State = state;
+        AttackTargetId = attackTargetId;
+        MoveTarget = moveTarget;
+        CooldownRemaining = Math.Max(0, cooldownRemaining);
+        HeadingDirection = headingDirection;
+        Morale.SetMorale(morale);
+        Charge.SetMomentum(momentumTicks);
+    }
+
     public void Attack(EntityId targetId)
     {
         if (!IsAlive || IsRouted) return;

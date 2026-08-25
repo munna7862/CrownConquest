@@ -27,6 +27,7 @@ public sealed class AiFactionController
     public AiBuildOrderPlan BuildOrder { get; }
     public AiArmySquad ArmySquad { get; }
     public AiPersonalityProfile Personality { get; set; }
+    public AiDifficultyConfig Difficulty { get; set; } = AiDifficultyConfig.CreateNormal();
     public Vector2D BasePosition { get; set; }
     public int TargetWorkerCount { get; set; }
     public FormationType CurrentFormation { get; private set; } = FormationType.Line;
@@ -36,11 +37,13 @@ public sealed class AiFactionController
         FactionId factionId,
         Vector2D basePosition,
         AiBuildOrderPlan? customPlan = null,
-        AiPersonalityProfile? personality = null)
+        AiPersonalityProfile? personality = null,
+        AiDifficultyConfig? difficulty = null)
     {
         FactionId = factionId;
         BasePosition = basePosition;
         Personality = personality ?? AiPersonalityProfile.CreateTactical();
+        Difficulty = difficulty ?? AiDifficultyConfig.CreateNormal();
         TargetWorkerCount = Personality.TargetWorkerCount;
         Perception = new AiPerceptionState(factionId);
         BuildOrder = customPlan ?? AiBuildOrderPlan.CreateStandardPlan();
@@ -71,26 +74,28 @@ public sealed class AiFactionController
 
         ulong adjustedTick = currentTick + (ulong)Math.Abs(tickOffset);
 
-        // 1. Perception update (every 6 ticks)
-        if (adjustedTick % (ulong)AiUpdateScheduler.PerceptionIntervalTicks == 0)
+        int intervalMult = Math.Max(1, Difficulty.DecisionIntervalMultiplier);
+
+        // 1. Perception update
+        if (adjustedTick % (ulong)(AiUpdateScheduler.PerceptionIntervalTicks * intervalMult) == 0)
         {
             Perception.UpdatePerception(state, currentTick);
         }
 
-        // 2. Economy & Worker AI (every 12 ticks)
-        if (adjustedTick % (ulong)AiUpdateScheduler.EconomyIntervalTicks == 0)
+        // 2. Economy & Worker AI
+        if (adjustedTick % (ulong)(AiUpdateScheduler.EconomyIntervalTicks * intervalMult) == 0)
         {
             UpdateEconomyAndWorkers(state, commandQueue, currentTick);
         }
 
-        // 3. Build Orders & Production AI (every 12 ticks, offset by 6)
-        if ((adjustedTick + (ulong)(AiUpdateScheduler.EconomyIntervalTicks / 2)) % (ulong)AiUpdateScheduler.ProductionIntervalTicks == 0)
+        // 3. Build Orders & Production AI
+        if ((adjustedTick + (ulong)(AiUpdateScheduler.EconomyIntervalTicks / 2)) % (ulong)(AiUpdateScheduler.ProductionIntervalTicks * intervalMult) == 0)
         {
             UpdateBuildOrdersAndProduction(state, commandQueue, currentTick);
         }
 
-        // 4. Military & Tactical Combat AI (every 4 ticks)
-        if (adjustedTick % (ulong)AiUpdateScheduler.TacticsIntervalTicks == 0)
+        // 4. Military & Tactical Combat AI
+        if (adjustedTick % (ulong)(AiUpdateScheduler.TacticsIntervalTicks * intervalMult) == 0)
         {
             UpdateArmyAndTactics(state, commandQueue, currentTick);
         }

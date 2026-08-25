@@ -106,4 +106,12 @@ public sealed class FactionTechManager
 
         return true;
     }
+
+    public void RestoreUnlockedTech(string techId)
+    {
+        if (!string.IsNullOrWhiteSpace(techId))
+        {
+            _unlockedTechIds.Add(techId);
+        }
+    }
 }

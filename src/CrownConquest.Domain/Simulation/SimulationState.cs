@@ -30,7 +30,7 @@ public sealed class SimulationState
     public PlacementGrid PlacementGrid { get; } = new(cellSize: 1.0f);
     public Combat.TerrainGrid TerrainGrid { get; } = new(64, 64, 1.0f);
 
-    public ulong CurrentTick { get; internal set; }
+    public ulong CurrentTick { get; set; }
     public IReadOnlyDictionary<EntityId, UnitEntity> Units => _units;
     public IReadOnlyList<UnitEntity> ActiveUnits => _activeUnitList;
 
@@ -47,6 +47,7 @@ public sealed class SimulationState
     public IReadOnlyDictionary<FactionId, FactionTechManager> TechManagers => _techManagers;
 
     public EntityId GenerateEntityId() => new(_nextEntityId++);
+    public void SetNextEntityId(int nextId) => _nextEntityId = nextId;
 
     public void AddBreach(BreachEntity breach)
     {
@@ -64,6 +65,12 @@ public sealed class SimulationState
         return bank;
     }
 
+    public void SetResourceBank(FactionId factionId, ResourceBank bank)
+    {
+        ArgumentNullException.ThrowIfNull(bank);
+        _resourceBanks[factionId] = bank;
+    }
+
     public PopulationManager GetOrCreatePopulationManager(FactionId factionId)
     {
         if (!_populationManagers.TryGetValue(factionId, out var manager))
@@ -72,6 +79,12 @@ public sealed class SimulationState
             _populationManagers[factionId] = manager;
         }
         return manager;
+    }
+
+    public void SetPopulationManager(FactionId factionId, PopulationManager manager)
+    {
+        ArgumentNullException.ThrowIfNull(manager);
+        _populationManagers[factionId] = manager;
     }
 
     public EraState GetOrCreateEraState(FactionId factionId)
@@ -84,6 +97,12 @@ public sealed class SimulationState
         return eraState;
     }
 
+    public void SetEraState(FactionId factionId, EraState eraState)
+    {
+        ArgumentNullException.ThrowIfNull(eraState);
+        _eraStates[factionId] = eraState;
+    }
+
     public FactionTechManager GetOrCreateTechManager(FactionId factionId)
     {
         if (!_techManagers.TryGetValue(factionId, out var techManager))
@@ -92,6 +111,12 @@ public sealed class SimulationState
             _techManagers[factionId] = techManager;
         }
         return techManager;
+    }
+
+    public void SetTechManager(FactionId factionId, FactionTechManager techManager)
+    {
+        ArgumentNullException.ThrowIfNull(techManager);
+        _techManagers[factionId] = techManager;
     }
 
     public void AddUnit(UnitEntity unit)
