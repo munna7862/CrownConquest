@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Crown &amp; Conquest"
            Manufacturer="CrownConquest Team"
-           Version="1.1.0"
+           Version="1.2.0"
            UpgradeCode="78620001-C001-4C10-9110-C00000000001"
            Scope="perMachine"
            Language="1033">

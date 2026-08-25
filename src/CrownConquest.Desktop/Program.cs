@@ -123,6 +123,9 @@ public static class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine(" [1] Launch Full 2D Graphical RTS Game Window (Godot 4 Viewport)");
             Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine(" [H] Historical Gauls vs Romans Battle Scenario & Match Results");
+            Console.ResetColor();
             Console.WriteLine(" [2] Headless Interactive Skirmish Match (Celtic vs Roman Legion)");
             Console.WriteLine(" [3] Tactical Combat Arena (Spearmen Formations vs Cavalry Charge)");
             Console.WriteLine(" [4] Settlement Economy & Worker Gathering (5-Resource Model)");
@@ -134,7 +137,7 @@ public static class Program
             Console.WriteLine(" [M] View Game Manual & Player Controls");
             Console.WriteLine(" [0] Exit");
             Console.WriteLine(" ------------------------------------------------------------------");
-            Console.Write(" Enter selection (0-9, M): ");
+            Console.Write(" Enter selection (0-9, H, M): ");
 
             var key = Console.ReadKey(intercept: true).KeyChar;
             Console.WriteLine(key);
@@ -144,6 +147,9 @@ public static class Program
             {
                 case '1':
                     LaunchGodotGraphicalWindow();
+                    break;
+                case 'H':
+                    RunHistoricalBattleScenario();
                     break;
                 case '2':
                     RunLiveSkirmishMatch();
@@ -194,7 +200,7 @@ public static class Program
   ██║     ██╔══██╗██║   ██║██║███╗██║██║╚██╗██║    ██║         ██║     ██║   ██║██║╚██╗██║██║   ██║██║   ██║██╔══╝  ╚════██║   ██║   
   ╚██████╗██║  ██║╚██████╔╝╚███╔███╔╝██║ ╚████║    ╚██████╗    ╚██████╗╚██████╔╝██║ ╚████║╚██████╔╝╚██████╔╝███████╗███████║   ██║   
    ╚═════╝╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═══╝     ╚═════╝     ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═════╝ ╚══════╝╚══════╝   ╚═╝   
-        v1.1.0 Graphical Edition  |  Authoritative Deterministic RTS/RPG  |  Windows x64
+        v1.2.0 Graphical Edition  |  Authoritative Deterministic RTS/RPG  |  Windows x64
         ");
         Console.ResetColor();
     }
@@ -271,6 +277,47 @@ public static class Program
         }
 
         return null;
+    }
+
+    private static void RunHistoricalBattleScenario()
+    {
+        Console.Clear();
+        PrintBanner();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("=== [MODE H] Historical Gauls vs Romans Battle Scenario ===");
+        Console.ResetColor();
+        Console.WriteLine("Simulating the Battle at the River Crossing: Celtic Tribe vs Roman Legion...\n");
+
+        var scenario = new HistoricalBattleScenario(seed: 1904);
+        int tick = 0;
+
+        while (tick < 300 && scenario.Outcome == MatchOutcome.Ongoing)
+        {
+            scenario.SimulateTicks(5);
+            tick += 5;
+
+            Console.Write($"\r[Tick {tick:D3}] Celtic Kills: {scenario.CelticKills:D2} | Roman Kills: {scenario.RomanKills:D2} | Hero Level: {scenario.CelticHeroBrennus.Veterancy.Level} | TC Health: Celtic {scenario.CelticTownCenter.CurrentHealth:F0} vs Roman {scenario.RomanTownCenter.CurrentHealth:F0}    ");
+            Thread.Sleep(20);
+        }
+
+        var summary = scenario.GetMatchSummary();
+        Console.WriteLine($"\n\n========================================================");
+        Console.ForegroundColor = summary.Outcome == MatchOutcome.Victory ? ConsoleColor.Green : ConsoleColor.Yellow;
+        Console.WriteLine($" {summary.BannerTitle}");
+        Console.ResetColor();
+        Console.WriteLine($" {summary.BannerSubtitle}");
+        Console.WriteLine($" --------------------------------------------------------");
+        Console.WriteLine($" Duration:            {summary.MatchDurationSeconds:F1}s ({summary.TotalTicksExecuted} ticks)");
+        Console.WriteLine($" Total Kills:         {summary.TotalKills}");
+        Console.WriteLine($" Casualties Lost:     {summary.TotalCasualtiesLost}");
+        Console.WriteLine($" Units Recruited:     {summary.UnitsTrained}");
+        Console.WriteLine($" Resources Gathered:  {summary.ResourcesHarvestedTotal}");
+        Console.WriteLine($" MVP Hero:            {summary.MvpHeroName} (Level {summary.MvpHeroLevel})");
+        Console.WriteLine($" Historical Dispatch: {summary.HistoricalSummary}");
+        Console.WriteLine($"========================================================\n");
+
+        Console.WriteLine("Press any key to return to menu...");
+        Console.ReadKey(intercept: true);
     }
 
     private static void RunLiveSkirmishMatch()
