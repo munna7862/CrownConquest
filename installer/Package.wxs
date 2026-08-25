@@ -1,0 +1,44 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Crown &amp; Conquest"
+           Manufacturer="CrownConquest Team"
+           Version="1.0.0"
+           UpgradeCode="78620001-C001-4C10-9110-C00000000001"
+           Scope="perMachine"
+           Language="1033">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Crown &amp; Conquest is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="CrownConquest">
+        <Component Id="MainExecutable" Bitness="always64">
+          <File Id="CrownConquestExe" Source="publish\win-x64\CrownConquest.exe" KeyPath="yes">
+            <Shortcut Id="StartMenuShortcut"
+                      Directory="ProgramMenuFolder"
+                      Name="Crown &amp; Conquest"
+                      WorkingDirectory="INSTALLFOLDER"
+                      Advertise="yes" />
+          </File>
+        </Component>
+        <Component Id="DocumentationManual" Bitness="always64">
+          <File Id="ManualDoc" Source="publish\win-x64\USER_MANUAL.md" KeyPath="yes" />
+        </Component>
+        <Component Id="CliReferenceDoc" Bitness="always64">
+          <File Id="CliDoc" Source="publish\win-x64\CLI_REFERENCE.md" KeyPath="yes" />
+        </Component>
+        <Component Id="ReleaseNotesDoc" Bitness="always64">
+          <File Id="NotesDoc" Source="publish\win-x64\RELEASE_NOTES_v1.0.0.md" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="MainFeature" Title="Crown &amp; Conquest Complete Game" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="DocumentationManual" />
+      <ComponentRef Id="CliReferenceDoc" />
+      <ComponentRef Id="ReleaseNotesDoc" />
+    </Feature>
+  </Package>
+</Wix>

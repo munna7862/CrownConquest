@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <RootNamespace>CrownConquest.Desktop</RootNamespace>
+    <AssemblyName>CrownConquest</AssemblyName>
+    <ApplicationTitle>Crown &amp; Conquest</ApplicationTitle>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Company>Crown &amp; Conquest Development Team</Company>
+    <Product>Crown &amp; Conquest</Product>
+    <Description>Deterministic RTS/RPG Desktop Game with Individual Unit Progression</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CrownConquest.Domain\CrownConquest.Domain.csproj" />
+    <ProjectReference Include="..\CrownConquest.Application\CrownConquest.Application.csproj" />
+    <ProjectReference Include="..\CrownConquest.Data\CrownConquest.Data.csproj" />
+    <ProjectReference Include="..\CrownConquest.Presentation\CrownConquest.Presentation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\data\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\docs\shipping\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
