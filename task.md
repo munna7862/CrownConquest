@@ -54,7 +54,7 @@
 
 - [x] **Stage 8: DevOps & Release Engineer (DO) — Release, Branch & Pull Request**
   - [x] Commit all changes with conventional commit messages.
-  - [x] Push feature branch and create Pull Request via `gh pr create`.
+  - [x] Push feature branch and create Pull Request via `gh pr create` ([PR #21](https://github.com/munna7862/CrownConquest/pull/21)).
   - [x] Update `task.md` and `walkthrough.md`.
   - [x] Conclude with `<!-- GOAL_COMPLETE -->`.
 
