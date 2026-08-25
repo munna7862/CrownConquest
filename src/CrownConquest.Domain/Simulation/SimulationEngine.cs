@@ -51,15 +51,28 @@ public sealed class SimulationEngine
     public SimulationEngine(
         SimulationConfig? config = null,
         DomainEventBus? eventBus = null,
-        BattlefieldBounds? bounds = null)
+        BattlefieldBounds? bounds = null,
+        SimulationState? initialState = null)
     {
         _config = config ?? SimulationConfig.Default;
         _random = new SimulationRandom(_config.InitialRandomSeed);
         _commandQueue = new CommandQueue();
         _eventBus = eventBus ?? new DomainEventBus();
-        _state = new SimulationState();
+        _state = initialState ?? new SimulationState();
         _bounds = bounds ?? BattlefieldBounds.Default;
         _spatialGrid = new SpatialGrid(cellSize: 8.0f);
+
+        if (initialState != null)
+        {
+            for (int i = 0; i < _state.ActiveUnits.Count; i++)
+            {
+                var u = _state.ActiveUnits[i];
+                if (u.IsAlive)
+                {
+                    _spatialGrid.Insert(u.Id, u.Position);
+                }
+            }
+        }
 
         RegisterDefaultTechnologies();
     }
