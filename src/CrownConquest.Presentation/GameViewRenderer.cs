@@ -262,6 +262,45 @@ public sealed class GameViewRenderer
         return _cachedResourceTokens;
     }
 
+    public List<DirectionalUnitVisualState> GenerateDirectionalUnitStates(ulong currentTick)
+    {
+        var units = _coordinator.Simulation.State.ActiveUnits;
+        var list = new List<DirectionalUnitVisualState>(units.Count);
+        for (int i = 0; i < units.Count; i++)
+        {
+            if (units[i].IsAlive)
+            {
+                list.Add(DirectionalSpriteController.GetVisualState(units[i], currentTick));
+            }
+        }
+        return list;
+    }
+
+    public List<BuildingSpriteDescriptor> GenerateBuildingSpriteDescriptors(ulong currentTick)
+    {
+        var buildings = _coordinator.Simulation.State.ActiveBuildings;
+        var list = new List<BuildingSpriteDescriptor>(buildings.Count);
+        for (int i = 0; i < buildings.Count; i++)
+        {
+            if (buildings[i].IsAlive)
+            {
+                list.Add(BuildingSpriteVisualMapper.GetDescriptor(buildings[i], currentTick));
+            }
+        }
+        return list;
+    }
+
+    public List<FoliageVisualState> GenerateFoliageStates(ulong currentTick)
+    {
+        var nodes = _coordinator.Simulation.State.ActiveResourceNodes;
+        var list = new List<FoliageVisualState>(nodes.Count);
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            list.Add(FoliageResourcePresenter.GetState(nodes[i], currentTick));
+        }
+        return list;
+    }
+
     public void UpdateVfxTicks()
     {
         for (int i = _floatingTexts.Count - 1; i >= 0; i--)
