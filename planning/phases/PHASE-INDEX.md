@@ -19,6 +19,7 @@ This directory contains the phase-wise implementation plans for the original RTS
 | 10 | PHASE-10-POLISH.md | UX, visuals, audio and tutorial |
 | 11 | PHASE-11-QA-RELEASE.md | QA, balancing and release |
 | 12 | PHASE-12-GRAPHICAL-PRESENTATION-AND-DISTRIBUTION.md | Full graphical presentation, Godot scene assembly and desktop distribution |
+| 13 | PHASE-13-CELTIC-KINGS-ART-AND-INTERACTIVE-RTS.md | Celtic Kings 2D sprite art, animated units, interactive buildings, sound & v1.2.0 release |
 
 ## Critical Design Dependency
 
