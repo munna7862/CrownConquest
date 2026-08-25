@@ -18,6 +18,7 @@ This directory contains the phase-wise implementation plans for the original RTS
 | 09 | PHASE-09-LARGE-SCALE-PERFORMANCE.md | Large army performance |
 | 10 | PHASE-10-POLISH.md | UX, visuals, audio and tutorial |
 | 11 | PHASE-11-QA-RELEASE.md | QA, balancing and release |
+| 12 | PHASE-12-GRAPHICAL-PRESENTATION-AND-DISTRIBUTION.md | Full graphical presentation, Godot scene assembly and desktop distribution |
 
 ## Critical Design Dependency
 

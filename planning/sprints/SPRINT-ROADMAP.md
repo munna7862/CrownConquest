@@ -20,10 +20,11 @@ The project is planned as **16 coordinated sprints** across all 12 implementatio
 | 13 | Polish | UX, visuals and audio | 70 | 10–15 days |
 | 14 | QA | Balance and validation | 65 | 10–12 days |
 | 15 | Release | Release candidate and shipping | 45 | 7–10 days |
+| 16 | Final Release | Godot graphical scene assembly, 2D RTS viewport & desktop packaging | 48 | 7–10 days |
 
 ## Total Planned Effort
 
-**834 story points**
+**882 story points**
 
 This is a relative planning baseline for the complete game vision.
 
@@ -36,7 +37,8 @@ This is a relative planning baseline for the complete game vision.
 - **Sprint 09:** AI-driven RTS
 - **Sprint 11:** Campaign RTS
 - **Sprint 13:** Polished gameplay experience
-- **Sprint 15:** Release candidate
+- **Sprint 15:** Release candidate & simulation shipping
+- **Sprint 16:** Full graphical Godot desktop game release (v1.1.0)
 
 ## Critical Rule
 

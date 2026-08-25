@@ -2,6 +2,7 @@
 .godot/
 .mono/
 .import/
+*.uid
 export.cfg
 export_presets.cfg
 
