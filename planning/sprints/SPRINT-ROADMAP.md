@@ -21,10 +21,13 @@ The project is planned as **16 coordinated sprints** across all 12 implementatio
 | 14 | QA | Balance and validation | 65 | 10–12 days |
 | 15 | Release | Release candidate and shipping | 45 | 7–10 days |
 | 16 | Final Release | Godot graphical scene assembly, 2D RTS viewport & desktop packaging | 48 | 7–10 days |
+| 17 | Celtic Kings Polish | Interactive building production, queues, rally flags & worker gathering loop | 40 | 6–8 days |
+| 18 | Celtic Kings Polish | 2D Celtic Kings sprite art, animated units, multi-layer terrain & Fog of War | 48 | 7–10 days |
+| 19 | Celtic Kings Polish | Unit voice barks, combat SFX, dynamic music, battle scenario & v1.2.0 release | 40 | 6–8 days |
 
 ## Total Planned Effort
 
-**882 story points**
+**1,010 story points**
 
 This is a relative planning baseline for the complete game vision.
 
@@ -39,6 +42,9 @@ This is a relative planning baseline for the complete game vision.
 - **Sprint 13:** Polished gameplay experience
 - **Sprint 15:** Release candidate & simulation shipping
 - **Sprint 16:** Full graphical Godot desktop game release (v1.1.0)
+- **Sprint 17:** Interactive settlement buildings, production queues & worker economy
+- **Sprint 18:** Authentic Celtic Kings 2D sprite art, directional unit animation & terrain
+- **Sprint 19:** Audio soundscape, voice barks, combat VFX & final v1.2.0 release
 
 ## Critical Rule
 
