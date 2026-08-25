@@ -28,3 +28,7 @@ desktop.ini
 *.log
 TestResults/
 coverage/
+
+# Distribution and publish outputs
+publish/
+dist/
