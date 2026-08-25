@@ -36,6 +36,7 @@ public static class Program
         bool isSmokeTest = false;
         bool isBenchmark = false;
         bool isValidateEnv = false;
+        bool isPlayGui = false;
         string scenarioName = "Main";
         int seed = 42;
         int ticks = 600;
@@ -43,10 +44,7 @@ public static class Program
         for (int i = 0; i < args.Length; i++)
         {
             string arg = args[i].ToLowerInvariant();
-            if (arg is "--headless" or "-h")
-            {
-                // Headless mode
-            }
+            if (arg is "--gui" or "--play" or "-g") isPlayGui = true;
             else if (arg is "--smoke-test" or "-s") isSmokeTest = true;
             else if (arg is "--benchmark" or "-b")
             {
@@ -72,6 +70,11 @@ public static class Program
                 ticks = tk;
                 i++;
             }
+        }
+
+        if (isPlayGui)
+        {
+            return LaunchGodotGraphicalWindow();
         }
 
         if (isValidateEnv)
@@ -117,54 +120,59 @@ public static class Program
             PrintBanner();
             Console.WriteLine(" Select a Game Mode or Scenario to Launch:");
             Console.WriteLine(" ------------------------------------------------------------------");
-            Console.WriteLine(" [1] Play Live Interactive Skirmish (Celtic Kingdom vs Roman Empire)");
-            Console.WriteLine(" [2] Tactical Combat Arena (Spearmen Formation vs Cavalry Charge)");
-            Console.WriteLine(" [3] Settlement Economy & Worker Gathering (5-Resource Model)");
-            Console.WriteLine(" [4] Siege Warfare Citadel Assault (Catapults & Wall Breaches)");
-            Console.WriteLine(" [5] RPG Hero Progression & Ability Showcase (Lord Aldric / Brennus)");
-            Console.WriteLine(" [6] Civilization Progression & Tech Tree Advance (Classical Era)");
-            Console.WriteLine(" [7] Run Clean-Machine Environment Diagnostics");
-            Console.WriteLine(" [8] Run High-Density 1,000-Unit Performance Benchmark");
-            Console.WriteLine(" [9] View Game Manual & Player Controls");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(" [1] Launch Full 2D Graphical RTS Game Window (Godot 4 Viewport)");
+            Console.ResetColor();
+            Console.WriteLine(" [2] Headless Interactive Skirmish Match (Celtic vs Roman Legion)");
+            Console.WriteLine(" [3] Tactical Combat Arena (Spearmen Formations vs Cavalry Charge)");
+            Console.WriteLine(" [4] Settlement Economy & Worker Gathering (5-Resource Model)");
+            Console.WriteLine(" [5] Siege Warfare Citadel Assault (Catapults & Wall Breaches)");
+            Console.WriteLine(" [6] RPG Hero Progression & Ability Showcase (Brennus / Lord Aldric)");
+            Console.WriteLine(" [7] Civilization Progression & Tech Tree Advance (Classical Era)");
+            Console.WriteLine(" [8] Run Clean-Machine Environment Diagnostics");
+            Console.WriteLine(" [9] Run High-Density 1,000-Unit Performance Benchmark");
+            Console.WriteLine(" [M] View Game Manual & Player Controls");
             Console.WriteLine(" [0] Exit");
             Console.WriteLine(" ------------------------------------------------------------------");
-            Console.Write(" Enter selection (0-9): ");
+            Console.Write(" Enter selection (0-9, M): ");
 
             var key = Console.ReadKey(intercept: true).KeyChar;
             Console.WriteLine(key);
             Console.WriteLine();
 
-            switch (key)
+            switch (char.ToUpperInvariant(key))
             {
                 case '1':
-                    RunLiveSkirmishMatch();
+                    LaunchGodotGraphicalWindow();
                     break;
                 case '2':
-                    RunTacticalCombatArena();
+                    RunLiveSkirmishMatch();
                     break;
                 case '3':
-                    RunSettlementEconomy();
+                    RunTacticalCombatArena();
                     break;
                 case '4':
-                    RunSiegeCitadelAssault();
+                    RunSettlementEconomy();
                     break;
                 case '5':
-                    RunHeroShowcase();
+                    RunSiegeCitadelAssault();
                     break;
                 case '6':
-                    RunCivilizationProgression();
+                    RunHeroShowcase();
                     break;
                 case '7':
-                    RunEnvironmentDiagnostics();
+                    RunCivilizationProgression();
                     break;
                 case '8':
-                    RunPerformanceBenchmark();
+                    RunEnvironmentDiagnostics();
                     break;
                 case '9':
+                    RunPerformanceBenchmark();
+                    break;
+                case 'M':
                     ShowUserManual();
                     break;
                 case '0':
-                case 'q':
                 case 'Q':
                     Console.WriteLine("Thank you for playing Crown & Conquest!");
                     return 0;
@@ -186,9 +194,83 @@ public static class Program
   ██║     ██╔══██╗██║   ██║██║███╗██║██║╚██╗██║    ██║         ██║     ██║   ██║██║╚██╗██║██║   ██║██║   ██║██╔══╝  ╚════██║   ██║   
   ╚██████╗██║  ██║╚██████╔╝╚███╔███╔╝██║ ╚████║    ╚██████╗    ╚██████╗╚██████╔╝██║ ╚████║╚██████╔╝╚██████╔╝███████╗███████║   ██║   
    ╚═════╝╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═══╝     ╚═════╝     ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═════╝ ╚══════╝╚══════╝   ╚═╝   
-        v1.0.0 Release Candidate  |  Authoritative Deterministic RTS/RPG  |  Windows x64 Edition
+        v1.1.0 Graphical Edition  |  Authoritative Deterministic RTS/RPG  |  Windows x64
         ");
         Console.ResetColor();
+    }
+
+    private static int LaunchGodotGraphicalWindow()
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("\n[GRAPHICS ENGINE] Initializing Godot 4 2D Graphical Viewport...");
+        Console.ResetColor();
+
+        string? godotExe = FindGodotExecutable();
+        if (godotExe == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ERROR] Godot 4 executable not found. Please ensure Godot 4.3+ is installed.");
+            Console.ResetColor();
+            Console.WriteLine("Press any key to return to menu...");
+            Console.ReadKey(intercept: true);
+            return 1;
+        }
+
+        string projectPath = Directory.GetCurrentDirectory();
+        if (!File.Exists(Path.Combine(projectPath, "project.godot")))
+        {
+            projectPath = AppDomain.CurrentDomain.BaseDirectory;
+        }
+
+        Console.WriteLine($"Launching Engine: {godotExe}");
+        Console.WriteLine($"Project Path:    {projectPath}\n");
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = godotExe,
+            Arguments = $"--path \"{projectPath}\"",
+            UseShellExecute = false
+        };
+
+        try
+        {
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit();
+            return proc?.ExitCode ?? 0;
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Failed to start graphics engine: {ex.Message}");
+            Console.ResetColor();
+            Console.WriteLine("Press any key to return to menu...");
+            Console.ReadKey(intercept: true);
+            return 1;
+        }
+    }
+
+    private static string? FindGodotExecutable()
+    {
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string currentDir = Directory.GetCurrentDirectory();
+
+        // 1. Check local bundle
+        string[] candidates = new[]
+        {
+            Path.Combine(baseDir, "Godot_Engine.exe"),
+            Path.Combine(baseDir, "godot.exe"),
+            Path.Combine(currentDir, "Godot_Engine.exe"),
+            Path.Combine(currentDir, "godot.exe"),
+            @"C:\Users\sadhi\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64.exe",
+            @"C:\Program Files\Godot\godot.exe"
+        };
+
+        foreach (var path in candidates)
+        {
+            if (File.Exists(path)) return path;
+        }
+
+        return null;
     }
 
     private static void RunLiveSkirmishMatch()
@@ -196,7 +278,7 @@ public static class Program
         Console.Clear();
         PrintBanner();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("=== [MODE 1] Live Interactive Skirmish Match ===");
+        Console.WriteLine("=== [MODE 2] Headless Interactive Skirmish Match ===");
         Console.ResetColor();
         Console.WriteLine("Simulating real-time battlefield clashing in fixed 50ms ticks (20Hz)...");
         Console.WriteLine("Press any key to pause / return to main menu at any time.\n");
@@ -249,7 +331,7 @@ public static class Program
         Console.Clear();
         PrintBanner();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("=== [MODE 2] Tactical Combat Arena ===");
+        Console.WriteLine("=== [MODE 3] Tactical Combat Arena ===");
         Console.ResetColor();
         Console.WriteLine("Simulating Tactical Formations (Spearmen in Line vs Cavalry in Wedge Charge)...");
 
@@ -273,7 +355,7 @@ public static class Program
         Console.Clear();
         PrintBanner();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("=== [MODE 3] Settlement Economy & Worker Gathering ===");
+        Console.WriteLine("=== [MODE 4] Settlement Economy & Worker Gathering ===");
         Console.ResetColor();
         Console.WriteLine("Simulating 5-Resource Economy (Food, Wood, Gold, Stone, Iron)...");
 
@@ -297,7 +379,7 @@ public static class Program
         Console.Clear();
         PrintBanner();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("=== [MODE 4] Siege Warfare Citadel Assault ===");
+        Console.WriteLine("=== [MODE 5] Siege Warfare Citadel Assault ===");
         Console.ResetColor();
         Console.WriteLine("Deploying Battering Rams, Catapults, Ballista Towers & Stone Gate defenses...");
 
@@ -320,7 +402,7 @@ public static class Program
         Console.Clear();
         PrintBanner();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("=== [MODE 5] RPG Hero Progression & Abilities ===");
+        Console.WriteLine("=== [MODE 6] RPG Hero Progression & Abilities ===");
         Console.ResetColor();
         Console.WriteLine("Simulating Heroic Commander (Brennus - Warlord Class)...");
 
@@ -337,7 +419,7 @@ public static class Program
         Console.Clear();
         PrintBanner();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("=== [MODE 6] Civilization Era & Tech Tree Progression ===");
+        Console.WriteLine("=== [MODE 7] Civilization Era & Tech Tree Progression ===");
         Console.ResetColor();
         Console.WriteLine("Advancing from Archaic Era to Classical Era with Blacksmith & Metallurgy techs...");
 
