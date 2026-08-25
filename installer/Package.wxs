@@ -20,6 +20,9 @@
                       Advertise="yes" />
           </File>
         </Component>
+        <Component Id="GamePackFile" Bitness="always64">
+          <File Id="CrownConquestPck" Source="publish\win-x64\CrownConquest.pck" KeyPath="yes" />
+        </Component>
         <Component Id="DocumentationManual" Bitness="always64">
           <File Id="ManualDoc" Source="publish\win-x64\USER_MANUAL.md" KeyPath="yes" />
         </Component>
@@ -34,8 +37,9 @@
 
     <StandardDirectory Id="ProgramMenuFolder" />
 
-    <Feature Id="MainFeature" Title="Crown &amp; Conquest Complete Game" Level="1">
+    <Feature Id="MainFeature" Title="Crown &amp; Conquest Complete Graphical Game" Level="1">
       <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="GamePackFile" />
       <ComponentRef Id="DocumentationManual" />
       <ComponentRef Id="CliReferenceDoc" />
       <ComponentRef Id="ReleaseNotesDoc" />
