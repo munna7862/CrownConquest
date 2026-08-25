@@ -1896,6 +1896,16 @@ public sealed class SimulationEngine
                 _state.AddUnit(producedUnit);
                 _spatialGrid.Insert(producedUnit.Id, producedUnit.Position);
 
+                // If rally point is near a resource node and unit is a worker, assign to harvest
+                if (producedUnit.WorkerState != null)
+                {
+                    var targetNode = FindNearestResourceNode(building.RallyPoint, null);
+                    if (targetNode != null && targetNode.Position.DistanceSquaredTo(building.RallyPoint) <= 9.0f)
+                    {
+                        producedUnit.AssignGather(targetNode.Id);
+                    }
+                }
+
                 _eventBus.Publish(new UnitSpawnedEvent(tick, unitId, building.FactionId, item.UnitType, producedUnit.Position));
                 _eventBus.Publish(new ProductionCompletedEvent(tick, building.Id, building.FactionId, item.UnitType, unitId));
                 SimLogger.LogInfo("Production", $"Trained unit {item.UnitType} {unitId} at {spawnPos}.");
@@ -2762,47 +2772,59 @@ public sealed class SimulationEngine
         var lower = unitType.ToLowerInvariant();
         if (lower.Contains("villager") || lower.Contains("worker") || lower.Contains("plebeian"))
         {
-            return (new ResourceCost(Food: 50), 50, 1);
+            return (new ResourceCost(Food: 50), 30, 1);
         }
-        if (lower.Contains("celtic_archer") || lower.Contains("roman_archer") || lower.Contains("archer") || lower.Contains("sagittarius") || lower.Contains("bowman"))
+        if (lower.Contains("celtic_swordsman"))
         {
-            return (new ResourceCost(Food: 40, Wood: 35), 60, 1);
+            return (new ResourceCost(Food: 60, Wood: 20), 30, 1);
+        }
+        if (lower.Contains("celtic_archer"))
+        {
+            return (new ResourceCost(Food: 50, Wood: 40), 30, 1);
+        }
+        if (lower.Contains("celtic_cavalry"))
+        {
+            return (new ResourceCost(Food: 70, Gold: 45), 35, 2);
+        }
+        if (lower.Contains("roman_archer") || lower.Contains("archer") || lower.Contains("sagittarius") || lower.Contains("bowman"))
+        {
+            return (new ResourceCost(Food: 40, Wood: 35), 35, 1);
         }
         if (lower.Contains("spearman") || lower.Contains("triarius") || lower.Contains("hoplite"))
         {
-            return (new ResourceCost(Food: 50, Gold: 25), 65, 1);
+            return (new ResourceCost(Food: 50, Gold: 25), 35, 1);
         }
         if (lower.Contains("cavalry") || lower.Contains("knight") || lower.Contains("equite") || lower.Contains("horseman") || lower.Contains("scout"))
         {
             if (lower.Contains("heavy"))
             {
-                return (new ResourceCost(Food: 90, Gold: 100), 110, 1);
+                return (new ResourceCost(Food: 90, Gold: 100), 50, 1);
             }
-            return (new ResourceCost(Food: 75, Gold: 50), 80, 1);
+            return (new ResourceCost(Food: 75, Gold: 50), 40, 1);
         }
         if (lower.Contains("legionary"))
         {
-            return (new ResourceCost(Food: 60, Iron: 25), 65, 1);
+            return (new ResourceCost(Food: 60, Iron: 25), 35, 1);
         }
         if (lower.Contains("veles"))
         {
-            return (new ResourceCost(Food: 40, Gold: 40), 70, 1);
+            return (new ResourceCost(Food: 40, Gold: 40), 35, 1);
         }
         if (lower.Contains("ram"))
         {
-            return (new ResourceCost(Wood: 150, Gold: 50), 100, 2);
+            return (new ResourceCost(Wood: 150, Gold: 50), 50, 2);
         }
         if (lower.Contains("catapult") || lower.Contains("onager"))
         {
-            return (new ResourceCost(Wood: 200, Gold: 100, Iron: 50), 120, 3);
+            return (new ResourceCost(Wood: 200, Gold: 100, Iron: 50), 60, 3);
         }
         if (lower.Contains("ballista") || lower.Contains("scorpion"))
         {
-            return (new ResourceCost(Wood: 150, Gold: 80, Iron: 40), 100, 2);
+            return (new ResourceCost(Wood: 150, Gold: 80, Iron: 40), 50, 2);
         }
 
         // Default Swordsman
-        return (new ResourceCost(Food: 60, Iron: 20), 60, 1);
+        return (new ResourceCost(Food: 60, Iron: 20), 30, 1);
     }
 
     public static (ResourceCost Cost, int DurationTicks, string[] RequiredBuildingTypes) GetEraConfig(CivilizationEra targetEra)

@@ -60,4 +60,18 @@ public sealed class BuildingPlacementPreview
             IsValid: isValid,
             StatusMessage: message);
     }
+
+    public static (Vector2D GridSize, ResourceCost Cost, int PopProvided, string DisplayName) GetBlueprintConfig(string buildingType)
+    {
+        return buildingType.ToLowerInvariant() switch
+        {
+            "house" => (new Vector2D(2f, 2f), new ResourceCost(Wood: 50), 5, "House"),
+            "barracks" => (new Vector2D(3f, 3f), new ResourceCost(Wood: 150), 0, "Barracks"),
+            "blacksmith" => (new Vector2D(3f, 3f), new ResourceCost(Wood: 150, Stone: 50), 0, "Blacksmith"),
+            "watchtower" or "tower" => (new Vector2D(2f, 2f), new ResourceCost(Wood: 50, Stone: 125), 0, "Watchtower"),
+            "farm" => (new Vector2D(2f, 2f), new ResourceCost(Wood: 60), 0, "Farm"),
+            "stables" or "stable" => (new Vector2D(3f, 3f), new ResourceCost(Wood: 150, Gold: 50), 0, "Stables"),
+            _ => (new Vector2D(2f, 2f), new ResourceCost(Wood: 100), 0, "Building")
+        };
+    }
 }

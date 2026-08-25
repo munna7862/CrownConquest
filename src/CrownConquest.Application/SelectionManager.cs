@@ -20,6 +20,8 @@ public sealed class SelectionManager
 
     public IReadOnlyList<EntityId> SelectedUnitIds => _selectedUnitIds;
     public FactionId LocalPlayerFaction => _localPlayerFaction;
+    public EntityId? SelectedBuildingId { get; private set; }
+    public BuildingEntity? SelectedBuilding => SelectedBuildingId.HasValue && _coordinator.Simulation.State.TryGetBuilding(SelectedBuildingId.Value, out var b) ? b : null;
 
     public SelectionManager(GameCoordinator coordinator, FactionId localPlayerFaction)
     {
@@ -31,7 +33,7 @@ public sealed class SelectionManager
     }
 
     /// <summary>
-    /// Selects a single unit near the given world coordinate.
+    /// Selects a single unit or building near the given world coordinate.
     /// </summary>
     public bool SelectPoint(Vector2D worldPos, float clickRadius = 1.0f)
     {
@@ -66,6 +68,7 @@ public sealed class SelectionManager
 
         if (bestCandidate != null)
         {
+            SelectedBuildingId = null;
             _selectedUnitIds.Add(bestCandidate.Id);
             _coordinator.DispatchCommand(new SelectUnitsCommand(
                 _localPlayerFaction,
@@ -75,6 +78,28 @@ public sealed class SelectionManager
             return true;
         }
 
+        // Check if a friendly building was clicked
+        var buildings = sim.State.ActiveBuildings;
+        for (int i = 0; i < buildings.Count; i++)
+        {
+            var b = buildings[i];
+            if (b.FactionId == _localPlayerFaction && b.IsAlive)
+            {
+                var expandedBox = Rect2D.FromCenterAndExtents(b.Position, (b.GridSize.X * 0.5f) + 0.5f, (b.GridSize.Y * 0.5f) + 0.5f);
+                if (expandedBox.Contains(worldPos) || b.Position.DistanceSquaredTo(worldPos) <= ((b.GridSize.X * 0.5f) * (b.GridSize.X * 0.5f)))
+                {
+                    SelectedBuildingId = b.Id;
+                    _coordinator.DispatchCommand(new SelectUnitsCommand(
+                        _localPlayerFaction,
+                        _coordinator.CurrentTick,
+                        Array.Empty<EntityId>(),
+                        ClearPrevious: true));
+                    return true;
+                }
+            }
+        }
+
+        SelectedBuildingId = null;
         _coordinator.DispatchCommand(new SelectUnitsCommand(
             _localPlayerFaction,
             _coordinator.CurrentTick,
@@ -83,11 +108,44 @@ public sealed class SelectionManager
         return false;
     }
 
+    public void SelectBuilding(EntityId buildingId)
+    {
+        _selectedUnitIds.Clear();
+        var sim = _coordinator.Simulation;
+        if (sim.State.TryGetBuilding(buildingId, out var b) && b != null && b.FactionId == _localPlayerFaction && b.IsAlive)
+        {
+            SelectedBuildingId = buildingId;
+        }
+        else
+        {
+            SelectedBuildingId = null;
+        }
+
+        _coordinator.DispatchCommand(new SelectUnitsCommand(
+            _localPlayerFaction,
+            _coordinator.CurrentTick,
+            Array.Empty<EntityId>(),
+            ClearPrevious: true));
+    }
+
+    public void SetBuildingRallyPoint(Vector2D rallyPos)
+    {
+        if (SelectedBuildingId.HasValue)
+        {
+            _coordinator.DispatchCommand(new SetRallyPointCommand(
+                _coordinator.CurrentTick,
+                _localPlayerFaction,
+                SelectedBuildingId.Value,
+                rallyPos));
+        }
+    }
+
     /// <summary>
     /// Selects all friendly units intersecting the 2D bounding marquee box.
     /// </summary>
     public int SelectBox(Rect2D box)
     {
+        SelectedBuildingId = null;
         _selectedUnitIds.Clear();
         _queryBuffer.Clear();
 
@@ -202,6 +260,7 @@ public sealed class SelectionManager
 
     public void ClearSelection()
     {
+        SelectedBuildingId = null;
         _selectedUnitIds.Clear();
         _coordinator.DispatchCommand(new SelectUnitsCommand(
             _localPlayerFaction,
