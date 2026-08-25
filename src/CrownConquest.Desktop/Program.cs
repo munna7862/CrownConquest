@@ -211,30 +211,46 @@ public static class Program
         Console.WriteLine("\n[GRAPHICS ENGINE] Initializing Godot 4 2D Graphical Viewport...");
         Console.ResetColor();
 
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string currentDir = Directory.GetCurrentDirectory();
+
         string? godotExe = FindGodotExecutable();
         if (godotExe == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("[ERROR] Godot 4 executable not found. Please ensure Godot 4.3+ is installed.");
+            Console.WriteLine("[ERROR] Godot 4 graphics runtime not found.");
+            Console.WriteLine("Please ensure Godot_Engine.exe is present in the game directory or launch CrownConquest_1.2.0_x64-setup.exe directly.");
             Console.ResetColor();
             Console.WriteLine("Press any key to return to menu...");
             Console.ReadKey(intercept: true);
             return 1;
         }
 
-        string projectPath = Directory.GetCurrentDirectory();
-        if (!File.Exists(Path.Combine(projectPath, "project.godot")))
+        string pckPath = Path.Combine(baseDir, "CrownConquest.pck");
+        if (!File.Exists(pckPath))
         {
-            projectPath = AppDomain.CurrentDomain.BaseDirectory;
+            pckPath = Path.Combine(currentDir, "CrownConquest.pck");
         }
 
-        Console.WriteLine($"Launching Engine: {godotExe}");
-        Console.WriteLine($"Project Path:    {projectPath}\n");
+        string arguments;
+        if (File.Exists(pckPath))
+        {
+            arguments = $"--main-pack \"{pckPath}\"";
+            Console.WriteLine($"Package File:    {pckPath}");
+        }
+        else
+        {
+            string projectPath = File.Exists(Path.Combine(currentDir, "project.godot")) ? currentDir : baseDir;
+            arguments = $"--path \"{projectPath}\"";
+            Console.WriteLine($"Project Path:    {projectPath}");
+        }
+
+        Console.WriteLine($"Graphics Engine: {godotExe}\n");
 
         var psi = new ProcessStartInfo
         {
             FileName = godotExe,
-            Arguments = $"--path \"{projectPath}\"",
+            Arguments = arguments,
             UseShellExecute = false
         };
 
@@ -260,14 +276,17 @@ public static class Program
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         string currentDir = Directory.GetCurrentDirectory();
 
-        // 1. Check local bundle
+        // 1. Check local directory and parent directories
         string[] candidates = new[]
         {
             Path.Combine(baseDir, "Godot_Engine.exe"),
+            Path.Combine(baseDir, "CrownConquest_Direct_Play.exe"),
             Path.Combine(baseDir, "godot.exe"),
             Path.Combine(currentDir, "Godot_Engine.exe"),
+            Path.Combine(currentDir, "CrownConquest_Direct_Play.exe"),
             Path.Combine(currentDir, "godot.exe"),
             @"C:\Users\sadhi\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64.exe",
+            @"C:\Users\sadhi\Downloads\Godot_Engine.exe",
             @"C:\Program Files\Godot\godot.exe"
         };
 
